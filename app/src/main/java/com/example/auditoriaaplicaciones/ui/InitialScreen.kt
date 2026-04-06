@@ -1,18 +1,20 @@
 package com.example.auditoriaaplicaciones.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
 
@@ -23,8 +25,48 @@ fun InitialScreen(
     onHistorialClick: () -> Unit,
     onDescargarExcelClick: () -> Unit
 ) {
+    var showSelectionDialog by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf("Menu") }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        when (currentScreen) {
+            "Menu" -> {
+                MainMenu(
+                    onAuditoriaClick = { showSelectionDialog = true },
+                    onHistorialClick = onHistorialClick,
+                    onDescargarExcelClick = onDescargarExcelClick
+                )
+
+                if (showSelectionDialog) {
+                    SelectionDialog(
+                        onDismiss = { showSelectionDialog = false },
+                        onOptionSelected = { option ->
+                            showSelectionDialog = false
+                            if (option == "Spray Boom") {
+                                currentScreen = "SprayBoom"
+                            }
+                        }
+                    )
+                }
+            }
+            "SprayBoom" -> {
+                SprayBoomChecklist(
+                    onBack = { currentScreen = "Menu" },
+                    onContinue = { /* Lógica para continuar */ }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MainMenu(
+    onAuditoriaClick: () -> Unit,
+    onHistorialClick: () -> Unit,
+    onDescargarExcelClick: () -> Unit
+) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -62,6 +104,114 @@ fun InitialScreen(
             onClick = onDescargarExcelClick,
             containerColor = MaterialTheme.colorScheme.tertiaryContainer
         )
+    }
+}
+
+@Composable
+fun SelectionDialog(
+    onDismiss: () -> Unit,
+    onOptionSelected: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Seleccione la Auditoría",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = { onOptionSelected("Mezclas") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                ) {
+                    Text("AUDITORÍA MEZCLAS", fontSize = 16.sp)
+                }
+                Button(
+                    onClick = { onOptionSelected("Spray Boom") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                ) {
+                    Text("AUDITORÍA SPRAY BOOM", fontSize = 16.sp)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun SprayBoomChecklist(
+    onBack: () -> Unit,
+    onContinue: () -> Unit
+) {
+    val items = listOf(
+        "Cronómetro",
+        "Probeta Granulada",
+        "Papel Hidrosensible",
+        "Kit de Calibración",
+        "Cinta Métrica"
+    )
+    val checkedStates = remember { mutableStateListOf(*Array(items.size) { false }) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+        Text(
+            text = "¿Cuenta con los siguientes materiales?",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        LazyColumn(modifier = Modifier.weight(1.0f)) {
+            items(items.size) { index ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Checkbox(
+                        checked = checkedStates[index],
+                        onCheckedChange = { checkedStates[index] = it }
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = items[index], fontSize = 18.sp)
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Volver")
+            }
+            Button(
+                onClick = onContinue,
+                modifier = Modifier.weight(1f),
+                enabled = checkedStates.all { it }
+            ) {
+                Text("Continuar")
+            }
+        }
     }
 }
 
