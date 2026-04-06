@@ -1,15 +1,15 @@
 package com.example.auditoriaaplicaciones.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +24,23 @@ import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Data class to store the audit information across screens
+data class AuditoriaInfo(
+    var evaluador: String = "",
+    var fecha: Long = System.currentTimeMillis(),
+    var hora: String = "",
+    var lote: String = "",
+    var finca: String = "",
+    var operador: String = "",
+    var codTractor: String = "",
+    var codImplemento: String = "",
+    var potenciaTractor: String = "",
+    var potenciaTdf: String = "",
+    var formula: String = "",
+    var presion: String = "",
+    var volumen: String = ""
+)
+
 @Composable
 fun InitialScreen(
     modifier: Modifier = Modifier,
@@ -33,6 +50,7 @@ fun InitialScreen(
 ) {
     var showSelectionDialog by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf("Menu") }
+    var auditoriaInfo by remember { mutableStateOf(AuditoriaInfo()) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when (currentScreen) {
@@ -64,7 +82,20 @@ fun InitialScreen(
             "DatosGenerales" -> {
                 DatosGeneralesScreen(
                     onBack = { currentScreen = "SprayBoom" },
-                    onContinue = { /* Lógica para continuar */ }
+                    onContinue = { info ->
+                        auditoriaInfo = info
+                        currentScreen = "FormularioAuditoria"
+                    }
+                )
+            }
+            "FormularioAuditoria" -> {
+                FormularioAuditoriaScreen(
+                    info = auditoriaInfo,
+                    onBack = { currentScreen = "DatosGenerales" },
+                    onContinue = { finalInfo ->
+                        auditoriaInfo = finalInfo
+                        /* Continuar a la siguiente lógica */
+                    }
                 )
             }
         }
@@ -230,15 +261,19 @@ fun SprayBoomChecklist(
 @Composable
 fun DatosGeneralesScreen(
     onBack: () -> Unit,
-    onContinue: () -> Unit
+    onContinue: (AuditoriaInfo) -> Unit
 ) {
     var evaluador by remember { mutableStateOf("") }
     var fecha by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var hour by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
+    var minute by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.MINUTE)) }
+    var showTimePicker by remember { mutableStateOf(false) }
     var lote by remember { mutableStateOf("") }
     var finca by remember { mutableStateOf("") }
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = fecha)
@@ -260,6 +295,30 @@ fun DatosGeneralesScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(initialHour = hour, initialMinute = minute)
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    hour = timePickerState.hour
+                    minute = timePickerState.minute
+                    showTimePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancelar")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            }
+        )
     }
 
     Column(
@@ -306,6 +365,27 @@ fun DatosGeneralesScreen(
         )
 
         OutlinedTextField(
+            value = String.format("%02d:%02d", hour, minute),
+            onValueChange = {},
+            label = { Text("Hora") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showTimePicker = true },
+            enabled = false,
+            readOnly = true,
+            trailingIcon = {
+                Icon(Icons.Default.Schedule, contentDescription = "Seleccionar hora")
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        OutlinedTextField(
             value = lote,
             onValueChange = { 
                 if (it.isEmpty() || (it.all { char -> char.isDigit() } && it.toInt() in 1..87)) {
@@ -339,9 +419,179 @@ fun DatosGeneralesScreen(
                 Text("Volver")
             }
             Button(
-                onClick = onContinue,
+                onClick = {
+                    onContinue(
+                        AuditoriaInfo(
+                            evaluador = evaluador,
+                            fecha = fecha,
+                            hora = String.format("%02d:%02d", hour, minute),
+                            finca = finca,
+                            lote = lote
+                        )
+                    )
+                },
                 modifier = Modifier.weight(1f),
                 enabled = evaluador.isNotBlank() && lote.isNotBlank() && finca.isNotBlank()
+            ) {
+                Text("Continuar")
+            }
+        }
+    }
+}
+
+@Composable
+fun FormularioAuditoriaScreen(
+    info: AuditoriaInfo,
+    onBack: () -> Unit,
+    onContinue: (AuditoriaInfo) -> Unit
+) {
+    var operador by remember { mutableStateOf("") }
+    var codTractor by remember { mutableStateOf("") }
+    var codImplemento by remember { mutableStateOf("") }
+    var potenciaTractor by remember { mutableStateOf("") }
+    var potenciaTdf by remember { mutableStateOf("") }
+    var formula by remember { mutableStateOf("") }
+    var presion by remember { mutableStateOf("") }
+    var volumen by remember { mutableStateOf("") }
+
+    val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // --- Header Section ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = "Resumen de Auditoría", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "Eval: ${info.evaluador}", fontSize = 14.sp)
+                    Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "Fecha: ${dateFormatter.format(Date(info.fecha))}", fontSize = 14.sp)
+                    Text(text = "Hora: ${info.hora}", fontSize = 14.sp)
+                }
+                Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
+            }
+        }
+
+        Text(
+            text = "Detalles de Auditoría",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        // --- Form Fields ---
+        OutlinedTextField(
+            value = operador,
+            onValueChange = { operador = it },
+            label = { Text("Nombre operador") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = codTractor,
+                onValueChange = { codTractor = it },
+                label = { Text("Cód. Tractor") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedTextField(
+                value = codImplemento,
+                onValueChange = { codImplemento = it },
+                label = { Text("Cód. Implemento") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = potenciaTractor,
+                onValueChange = { potenciaTractor = it },
+                label = { Text("Potencia Tractor (HP)") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedTextField(
+                value = potenciaTdf,
+                onValueChange = { potenciaTdf = it },
+                label = { Text("Potencia TDF/PPO (HP)") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        OutlinedTextField(
+            value = formula,
+            onValueChange = { formula = it },
+            label = { Text("Fórmula a aplicar") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = presion,
+                onValueChange = { presion = it },
+                label = { Text("Presión (PSI)") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedTextField(
+                value = volumen,
+                onValueChange = { volumen = it },
+                label = { Text("Volumen aplicar") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Volver")
+            }
+            Button(
+                onClick = {
+                    onContinue(
+                        info.copy(
+                            operador = operador,
+                            codTractor = codTractor,
+                            codImplemento = codImplemento,
+                            potenciaTractor = potenciaTractor,
+                            potenciaTdf = potenciaTdf,
+                            formula = formula,
+                            presion = presion,
+                            volumen = volumen
+                        )
+                    )
+                },
+                modifier = Modifier.weight(1f),
+                enabled = operador.isNotBlank() && formula.isNotBlank() && volumen.isNotBlank()
             ) {
                 Text("Continuar")
             }
