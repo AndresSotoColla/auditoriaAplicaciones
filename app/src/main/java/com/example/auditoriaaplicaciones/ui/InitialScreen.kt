@@ -1543,7 +1543,7 @@ fun FormularioMezclasScreen(
                     colors = blackTextFieldColors()
                 )
 
-                androidx.compose.material3.ExposedDropdownMenuBox(
+                ExposedDropdownMenuBox(
                     expanded = expandedFormula,
                     onExpandedChange = { expandedFormula = !expandedFormula },
                     modifier = Modifier.fillMaxWidth()
@@ -1562,12 +1562,12 @@ fun FormularioMezclasScreen(
                     
                     val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
-                        androidx.compose.material3.ExposedDropdownMenu(
+                        ExposedDropdownMenu(
                             expanded = expandedFormula,
                             onDismissRequest = { expandedFormula = false }
                         ) {
                             filteredCodigos.forEach { cod ->
-                                androidx.compose.material3.DropdownMenuItem(
+                                DropdownMenuItem(
                                     text = { Text(cod, color = Color.Black) },
                                     onClick = {
                                         formula = cod
