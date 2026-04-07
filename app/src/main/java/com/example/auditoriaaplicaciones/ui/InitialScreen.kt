@@ -3,7 +3,11 @@ package com.example.auditoriaaplicaciones.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.Parcelable
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +40,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.io.File
 // Deleted Parcelize import
 import java.text.SimpleDateFormat
 import java.util.*
@@ -1193,7 +1198,15 @@ object ExportManager {
                 put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
             }
 
-            val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            } else {
+                val file = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    fileName
+                )
+                Uri.fromFile(file)
+            }
             if (uri != null) {
                 resolver.openOutputStream(uri)?.use { outputStream ->
                     workbook.write(outputStream)
