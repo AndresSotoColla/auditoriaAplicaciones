@@ -233,20 +233,29 @@ fun MainMenu(
     ) {
         Spacer(modifier = Modifier.weight(1f))
         
-        Text(
-            text = "Auditoria APLICACIONES",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            textAlign = TextAlign.Center,
-            color = Color.White
-        )
-        Text(
-            text = "auditorias generales",
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            color = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.padding(bottom = 48.dp)
-        )
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Auditoria APLICACIONES",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "auditorias generales",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
 
         MenuButton(
             text = "Auditoría Aplicaciones",
@@ -272,12 +281,18 @@ fun MainMenu(
         
         Spacer(modifier = Modifier.weight(1f))
         
-        Text(
-            text = "CT&A 2026",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
+        Surface(
+            color = Color(0xFFF5E1C8),
+            contentColor = Color.Black,
+            shape = RoundedCornerShape(8.dp),
             modifier = Modifier.padding(bottom = 16.dp)
-        )
+        ) {
+            Text(
+                text = "CT&A 2026",
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
     }
 }
 
@@ -341,6 +356,7 @@ fun SprayBoomChecklist(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xE6F5E1C8)) // Fondo beige translúcido (90%) para lectura
             .padding(24.dp)
     ) {
         Text(
@@ -466,6 +482,7 @@ fun DatosGeneralesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xE6F5E1C8)) // Fondo beige translúcido (90%)
             .padding(24.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -683,6 +700,7 @@ fun FormularioAuditoriaScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xE6F5E1C8)) // Fondo beige translúcido (90%)
             .padding(24.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -1121,7 +1139,7 @@ fun HistorialScreen(onBack: () -> Unit) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xE6F5E1C8)).padding(16.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
