@@ -36,11 +36,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import java.io.File
+import androidx.compose.ui.text.style.TextAlign
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.graphics.Color
 // Deleted Parcelize import
 import java.text.SimpleDateFormat
 import java.util.*
@@ -89,6 +92,42 @@ data class AuditoriaInfo(
 ) : Serializable
 
 @Composable
+fun BackgroundVideo() {
+    val context = LocalContext.current
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            val uri = Uri.parse("android.resource://${context.packageName}/raw/bg_video")
+            setMediaItem(MediaItem.fromUri(uri))
+            repeatMode = Player.REPEAT_MODE_ALL
+            volume = 0f
+            playWhenReady = true
+            prepare()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    AndroidView(
+        factory = {
+            PlayerView(it).apply {
+                player = exoPlayer
+                useController = false
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                layoutParams = android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+@Composable
 fun InitialScreen(
     modifier: Modifier = Modifier,
     onAuditoriaClick: () -> Unit,
@@ -100,7 +139,10 @@ fun InitialScreen(
     var auditoriaInfo by rememberSaveable { mutableStateOf(AuditoriaInfo()) }
     val context = LocalContext.current
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        BackgroundVideo()
+        
+        Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "DEBUG INFO -> Pantalla Actual: $currentScreen",
             color = androidx.compose.ui.graphics.Color.Red,
@@ -183,19 +225,27 @@ fun MainMenu(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Spacer(modifier = Modifier.weight(1f))
+        
         Text(
-            text = "Auditoría de Aplicaciones",
+            text = "Auditoria APLICACIONES",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+            color = Color.White
+        )
+        Text(
+            text = "auditorias generales",
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            color = Color.White.copy(alpha = 0.9f),
             modifier = Modifier.padding(bottom = 48.dp)
         )
 
         MenuButton(
             text = "Auditoría Aplicaciones",
             icon = Icons.Default.Checklist,
-            onClick = onAuditoriaClick,
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            onClick = onAuditoriaClick
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -203,8 +253,7 @@ fun MainMenu(
         MenuButton(
             text = "Ver Historial",
             icon = Icons.Default.History,
-            onClick = onHistorialClick,
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
+            onClick = onHistorialClick
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -212,8 +261,16 @@ fun MainMenu(
         MenuButton(
             text = "Descargar Excel",
             icon = Icons.Default.Download,
-            onClick = onDescargarExcelClick,
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            onClick = onDescargarExcelClick
+        )
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        Text(
+            text = "CT&A 2026",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
     }
 }
@@ -237,14 +294,14 @@ fun SelectionDialog(
                 Button(
                     onClick = { onOptionSelected("Mezclas") },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black)
                 ) {
                     Text("AUDITORÍA MEZCLAS", fontSize = 16.sp)
                 }
                 Button(
                     onClick = { onOptionSelected("Spray Boom") },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black)
                 ) {
                     Text("AUDITORÍA SPRAY BOOM", fontSize = 16.sp)
                 }
@@ -940,8 +997,7 @@ fun FormularioAuditoriaScreen(
 fun MenuButton(
     text: String,
     icon: ImageVector,
-    onClick: () -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color
+    onClick: () -> Unit
 ) {
     Button(
         onClick = onClick,
@@ -950,10 +1006,10 @@ fun MenuButton(
             .height(80.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
-            contentColor = contentColorFor(containerColor)
+            containerColor = Color(0xFFF5E1C8), // Beige Claro
+            contentColor = Color.Black
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
