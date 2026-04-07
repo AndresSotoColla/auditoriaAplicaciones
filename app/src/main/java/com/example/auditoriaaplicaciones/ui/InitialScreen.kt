@@ -3,6 +3,7 @@ package com.example.auditoriaaplicaciones.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Parcelable
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,13 +34,16 @@ import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.parcelize.Parcelize
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.random.Random
 
-// Data class to store the audit information across screens
-data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "")
+// Para soportar guardado de estado ante rotaciones, los usamos como Parcelable
+@Parcelize
+data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Parcelable
 
+@Parcelize
 data class AuditoriaInfo(
     var evaluador: String = "",
     var fecha: Long = System.currentTimeMillis(),
@@ -54,15 +59,25 @@ data class AuditoriaInfo(
     var presion: String = "",
     var volumen: String = "",
     
-    // Nuevos campos para boquillas
+    // Boquillas
     var nozzlesIzquierdo: List<NozzleData> = emptyList(),
     var nozzlesDerecho: List<NozzleData> = emptyList(),
     
     // GPS y Desplazamiento
     var tiempoDesplazamientoSegundos: Long = 0,
     var distanciaMetros: Float = 0f,
-    var velocidadKmh: Float = 0f
-)
+    var velocidadKmh: Float = 0f,
+
+    // Cuestionario Final
+    var boquillasTapadas: Boolean? = null,
+    var boquillasTapadasNum: String = "",
+    var presenciaPersonal: Boolean? = null,
+    var alturaUniforme: Boolean? = null,
+    var estadoVia: String = "", // "BUENO", "REGULAR", "MALO"
+    var papelHidrosensible: Boolean = false,
+    var papelGotas1cm: String = "",
+    var papelGotasCuarto: String = ""
+) : Parcelable
 
 @Composable
 fun InitialScreen(
@@ -71,13 +86,12 @@ fun InitialScreen(
     onHistorialClick: () -> Unit,
     onDescargarExcelClick: () -> Unit
 ) {
-    var showSelectionDialog by remember { mutableStateOf(false) }
-    var currentScreen by remember { mutableStateOf("Menu") }
-    var auditoriaInfo by remember { mutableStateOf(AuditoriaInfo()) }
+    var showSelectionDialog by rememberSaveable { mutableStateOf(false) }
+    var currentScreen by rememberSaveable { mutableStateOf("Menu") }
+    var auditoriaInfo by rememberSaveable { mutableStateOf(AuditoriaInfo()) }
     val context = LocalContext.current
 
     Column(modifier = modifier.fillMaxSize()) {
-        // DEBUG TEXT VISIBLE EN PANTALLA
         Text(
             text = "DEBUG INFO -> Pantalla Actual: $currentScreen",
             color = androidx.compose.ui.graphics.Color.Red,
@@ -114,6 +128,7 @@ fun InitialScreen(
                 }
                 "DatosGenerales" -> {
                     DatosGeneralesScreen(
+                        infoInicial = auditoriaInfo,
                         onBack = { currentScreen = "SprayBoom" },
                         onContinue = { info ->
                             Toast.makeText(context, "Navigating to Formulario...", Toast.LENGTH_SHORT).show()
@@ -128,7 +143,8 @@ fun InitialScreen(
                         onBack = { currentScreen = "DatosGenerales" },
                         onContinue = { finalInfo ->
                             auditoriaInfo = finalInfo
-                            /* Continuar a la siguiente lógica */
+                            Toast.makeText(context, "¡Auditoría Guardada Completamente!", Toast.LENGTH_LONG).show()
+                            currentScreen = "Menu" // Vuelve al menú con éxito
                         }
                     )
                 }
@@ -238,7 +254,9 @@ fun SprayBoomChecklist(
         "Kit de Calibración",
         "Cinta Métrica"
     )
-    val checkedStates = remember { mutableStateListOf(*Array(items.size) { false }) }
+    
+    // Saveable Custom Saver or simpler approach: ArrayList
+    var checkedStatesValues by rememberSaveable { mutableStateOf(BooleanArray(items.size) { false }) }
 
     Column(
         modifier = Modifier
@@ -261,8 +279,12 @@ fun SprayBoomChecklist(
                         .padding(vertical = 8.dp)
                 ) {
                     Checkbox(
-                        checked = checkedStates[index],
-                        onCheckedChange = { checkedStates[index] = it }
+                        checked = checkedStatesValues[index],
+                        onCheckedChange = { isChecked ->
+                            val nArr = checkedStatesValues.copyOf()
+                            nArr[index] = isChecked
+                            checkedStatesValues = nArr
+                        }
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(text = items[index], fontSize = 18.sp)
@@ -295,18 +317,22 @@ fun SprayBoomChecklist(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DatosGeneralesScreen(
+    infoInicial: AuditoriaInfo,
     onBack: () -> Unit,
     onContinue: (AuditoriaInfo) -> Unit
 ) {
-    var evaluador by remember { mutableStateOf("") }
-    var fecha by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var hour by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
-    var minute by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.MINUTE)) }
-    var showTimePicker by remember { mutableStateOf(false) }
-    var lote by remember { mutableStateOf("") }
-    var finca by remember { mutableStateOf("") }
-    var debugErrorMsg by remember { mutableStateOf("") }
+    var evaluador by rememberSaveable { mutableStateOf(infoInicial.evaluador) }
+    var fecha by rememberSaveable { mutableStateOf(infoInicial.fecha) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    
+    val cal = Calendar.getInstance().apply { timeInMillis = infoInicial.fecha }
+    var hour by rememberSaveable { mutableStateOf(if (infoInicial.hora.isNotEmpty()) infoInicial.hora.split(":")[0].toInt() else cal.get(Calendar.HOUR_OF_DAY)) }
+    var minute by rememberSaveable { mutableStateOf(if (infoInicial.hora.isNotEmpty()) infoInicial.hora.split(":")[1].toInt() else cal.get(Calendar.MINUTE)) }
+    
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    var lote by rememberSaveable { mutableStateOf(infoInicial.lote) }
+    var finca by rememberSaveable { mutableStateOf(infoInicial.finca) }
+    var debugErrorMsg by rememberSaveable { mutableStateOf("") }
 
     val context = LocalContext.current
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
@@ -394,8 +420,7 @@ fun DatosGeneralesScreen(
             colors = OutlinedTextFieldDefaults.colors(
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                disabledBorderColor = MaterialTheme.colorScheme.outline
             ),
             shape = RoundedCornerShape(12.dp)
         )
@@ -415,8 +440,7 @@ fun DatosGeneralesScreen(
             colors = OutlinedTextFieldDefaults.colors(
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                disabledBorderColor = MaterialTheme.colorScheme.outline
             ),
             shape = RoundedCornerShape(12.dp)
         )
@@ -445,7 +469,6 @@ fun DatosGeneralesScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // MOSTRAR ERRORES EN PANTALLA
         if (debugErrorMsg.isNotEmpty()) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
@@ -481,15 +504,15 @@ fun DatosGeneralesScreen(
                         debugErrorMsg = "ERROR: Lote '${lote}' (numeral=$loteNum) no está entre 1 y 87."
                     } else {
                         debugErrorMsg = "Navegando a FormularioAuditoria..."
-                        onContinue(
-                            AuditoriaInfo(
-                                evaluador = evaluador,
-                                fecha = fecha,
-                                hora = String.format("%02d:%02d", hour, minute),
-                                finca = finca,
-                                lote = lote
-                            )
+                        
+                        val updatedInfo = infoInicial.copy(
+                            evaluador = evaluador,
+                            fecha = fecha,
+                            hora = String.format("%02d:%02d", hour, minute),
+                            finca = finca,
+                            lote = lote
                         )
+                        onContinue(updatedInfo)
                     }
                 },
                 modifier = Modifier.weight(1f)
@@ -507,18 +530,18 @@ fun FormularioAuditoriaScreen(
     onContinue: (AuditoriaInfo) -> Unit
 ) {
     val context = LocalContext.current
-    var operador by remember { mutableStateOf(info.operador) }
-    var codTractor by remember { mutableStateOf(info.codTractor) }
-    var codImplemento by remember { mutableStateOf(info.codImplemento) }
-    var potenciaTractor by remember { mutableStateOf(info.potenciaTractor) }
-    var potenciaTdf by remember { mutableStateOf(info.potenciaTdf) }
-    var formula by remember { mutableStateOf(info.formula) }
-    var presion by remember { mutableStateOf(info.presion) }
-    var volumen by remember { mutableStateOf(info.volumen) }
+    var operador by rememberSaveable { mutableStateOf(info.operador) }
+    var codTractor by rememberSaveable { mutableStateOf(info.codTractor) }
+    var codImplemento by rememberSaveable { mutableStateOf(info.codImplemento) }
+    var potenciaTractor by rememberSaveable { mutableStateOf(info.potenciaTractor) }
+    var potenciaTdf by rememberSaveable { mutableStateOf(info.potenciaTdf) }
+    var formula by rememberSaveable { mutableStateOf(info.formula) }
+    var presion by rememberSaveable { mutableStateOf(info.presion) }
+    var volumen by rememberSaveable { mutableStateOf(info.volumen) }
 
     // --- Lógica Boquillas Aleatorias ---
-    var leftNozzles by remember { mutableStateOf(info.nozzlesIzquierdo) }
-    var rightNozzles by remember { mutableStateOf(info.nozzlesDerecho) }
+    var leftNozzles by rememberSaveable { mutableStateOf(info.nozzlesIzquierdo) }
+    var rightNozzles by rememberSaveable { mutableStateOf(info.nozzlesDerecho) }
 
     LaunchedEffect(Unit) {
         if (leftNozzles.isEmpty()) {
@@ -537,16 +560,20 @@ fun FormularioAuditoriaScreen(
 
     // --- Lógica Medición GPS ---
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    var isMeasuring by remember { mutableStateOf(false) }
-    var startLoc by remember { mutableStateOf<Location?>(null) }
-    var endLoc by remember { mutableStateOf<Location?>(null) }
-    var startTime by remember { mutableStateOf(0L) }
+    var isMeasuring by rememberSaveable { mutableStateOf(false) }
+    var startTime by rememberSaveable { mutableStateOf(0L) }
     
-    var calcDistance by remember { mutableStateOf(0f) }
-    var calcTimeSec by remember { mutableStateOf(0L) }
-    var calcSpeed by remember { mutableStateOf(0f) }
-    var calcError by remember { mutableStateOf(0f) }
-    var gpsStatus by remember { mutableStateOf("Listo para medir") }
+    // Location objects are not Parcelable in the way rememberSaveable likes natively in some versions,
+    // so we store coordinates manually to be safe on rotation!
+    var startLat by rememberSaveable { mutableStateOf(0.0) }
+    var startLng by rememberSaveable { mutableStateOf(0.0) }
+    var startAcc by rememberSaveable { mutableStateOf(0f) }
+    
+    var calcDistance by rememberSaveable { mutableStateOf(info.distanciaMetros) }
+    var calcTimeSec by rememberSaveable { mutableStateOf(info.tiempoDesplazamientoSegundos) }
+    var calcSpeed by rememberSaveable { mutableStateOf(info.velocidadKmh) }
+    var calcError by rememberSaveable { mutableStateOf(0f) }
+    var gpsStatus by rememberSaveable { mutableStateOf(if (calcDistance > 0) "Medición completada." else "Listo para medir") }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -558,6 +585,18 @@ fun FormularioAuditoriaScreen(
             Toast.makeText(context, "Permiso GPS denegado.", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // --- Final Cuestionario ---
+    var boquillasTapadas by rememberSaveable { mutableStateOf(info.boquillasTapadas) }
+    var boquillasTapadasNum by rememberSaveable { mutableStateOf(info.boquillasTapadasNum) }
+    
+    var presenciaPersonal by rememberSaveable { mutableStateOf(info.presenciaPersonal) }
+    var alturaUniforme by rememberSaveable { mutableStateOf(info.alturaUniforme) }
+    var estadoVia by rememberSaveable { mutableStateOf(info.estadoVia) }
+    
+    var papelHidro by rememberSaveable { mutableStateOf(info.papelHidrosensible) }
+    var papelGotas1cm by rememberSaveable { mutableStateOf(info.papelGotas1cm) }
+    var papelGotasCuarto by rememberSaveable { mutableStateOf(info.papelGotasCuarto) }
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
@@ -675,7 +714,9 @@ fun FormularioAuditoriaScreen(
                             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
                                 .addOnSuccessListener { location: Location? ->
                                     if (location != null) {
-                                        startLoc = location
+                                        startLat = location.latitude
+                                        startLng = location.longitude
+                                        startAcc = location.accuracy
                                         startTime = System.currentTimeMillis()
                                         isMeasuring = true
                                         gpsStatus = "Midiendo... Camine y luego detenga."
@@ -698,20 +739,25 @@ fun FormularioAuditoriaScreen(
                                 gpsStatus = "Obteniendo ubicación final..."
                                 fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
                                     .addOnSuccessListener { location: Location? ->
-                                        if (location != null && startLoc != null) {
-                                            endLoc = location
+                                        if (location != null && startLat != 0.0) {
+                                            
+                                            // Recreate startLocation
+                                            val startLocationObj = Location("").apply {
+                                                latitude = startLat
+                                                longitude = startLng
+                                            }
+
                                             val eTime = System.currentTimeMillis()
                                             
-                                            // Cálculos
                                             calcTimeSec = (eTime - startTime) / 1000
-                                            calcDistance = startLoc!!.distanceTo(location)
+                                            calcDistance = startLocationObj.distanceTo(location)
                                             
                                             // v = d(m) / t(s) * 3.6 = km/h
                                             if (calcTimeSec > 0) {
                                                 calcSpeed = (calcDistance / calcTimeSec) * 3.6f
                                             }
                                             
-                                            calcError = (startLoc!!.accuracy + location.accuracy) / 2f
+                                            calcError = (startAcc + location.accuracy) / 2f
                                             isMeasuring = false
                                             gpsStatus = "Medición completada."
                                         } else {
@@ -738,6 +784,99 @@ fun FormularioAuditoriaScreen(
             Text(text = "Margen Error: ±${String.format(Locale.US, "%.1f", calcError)}m", color = androidx.compose.ui.graphics.Color.Gray)
         }
 
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // --- Cuestionario Final ---
+        Text(text = "¿Boquillas tapadas?", fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = boquillasTapadas == true, onClick = { boquillasTapadas = true })
+            Text("Sí")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(selected = boquillasTapadas == false, onClick = { 
+                boquillasTapadas = false 
+                boquillasTapadasNum = "" // Reset if changing answer
+            })
+            Text("No")
+        }
+        if (boquillasTapadas == true) {
+            OutlinedTextField(
+                value = boquillasTapadasNum,
+                onValueChange = { boquillasTapadasNum = it },
+                label = { Text("¿Cuántas boquillas?") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(text = "¿Presencia de personal en el bloque aplicado?", fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = presenciaPersonal == true, onClick = { presenciaPersonal = true })
+            Text("Sí")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(selected = presenciaPersonal == false, onClick = { presenciaPersonal = false })
+            Text("No")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(text = "¿Operador mantuvo brazos a altura uniforme?", fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = alturaUniforme == true, onClick = { alturaUniforme = true })
+            Text("Sí")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(selected = alturaUniforme == false, onClick = { alturaUniforme = false })
+            Text("No")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(text = "Estado vía", fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = estadoVia == "BUENO", onClick = { estadoVia = "BUENO" })
+            Text("Bueno")
+            Spacer(modifier = Modifier.width(8.dp))
+            RadioButton(selected = estadoVia == "REGULAR", onClick = { estadoVia = "REGULAR" })
+            Text("Regular")
+            Spacer(modifier = Modifier.width(8.dp))
+            RadioButton(selected = estadoVia == "MALO", onClick = { estadoVia = "MALO" })
+            Text("Malo")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = papelHidro, onCheckedChange = { papelHidro = it })
+            Text(text = "Papel Hidrosensible", fontWeight = FontWeight.Bold)
+        }
+
+        if (papelHidro) {
+            Column(modifier = Modifier.padding(start = 32.dp)) {
+                Text("Ingresa la cantidad de gotas según el área seleccionada:")
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top=8.dp)) {
+                    OutlinedTextField(
+                        value = papelGotas1cm,
+                        onValueChange = { papelGotas1cm = it },
+                        label = { Text("Gotas (1cm²)") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = papelGotasCuarto,
+                        onValueChange = { papelGotasCuarto = it },
+                        label = { Text("Gotas (1/4 cm²)") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            }
+        }
+
+
         Spacer(modifier = Modifier.height(24.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -746,27 +885,35 @@ fun FormularioAuditoriaScreen(
             }
             Button(
                 onClick = {
-                    onContinue(
-                        info.copy(
-                            operador = operador,
-                            codTractor = codTractor,
-                            codImplemento = codImplemento,
-                            potenciaTractor = potenciaTractor,
-                            potenciaTdf = potenciaTdf,
-                            formula = formula,
-                            presion = presion,
-                            volumen = volumen,
-                            nozzlesIzquierdo = leftNozzles,
-                            nozzlesDerecho = rightNozzles,
-                            tiempoDesplazamientoSegundos = calcTimeSec,
-                            distanciaMetros = calcDistance,
-                            velocidadKmh = calcSpeed
-                        )
+                    val updatedInfo = info.copy(
+                        operador = operador,
+                        codTractor = codTractor,
+                        codImplemento = codImplemento,
+                        potenciaTractor = potenciaTractor,
+                        potenciaTdf = potenciaTdf,
+                        formula = formula,
+                        presion = presion,
+                        volumen = volumen,
+                        nozzlesIzquierdo = leftNozzles,
+                        nozzlesDerecho = rightNozzles,
+                        tiempoDesplazamientoSegundos = calcTimeSec,
+                        distanciaMetros = calcDistance,
+                        velocidadKmh = calcSpeed,
+                        
+                        boquillasTapadas = boquillasTapadas,
+                        boquillasTapadasNum = boquillasTapadasNum,
+                        presenciaPersonal = presenciaPersonal,
+                        alturaUniforme = alturaUniforme,
+                        estadoVia = estadoVia,
+                        papelHidrosensible = papelHidro,
+                        papelGotas1cm = papelGotas1cm,
+                        papelGotasCuarto = papelGotasCuarto
                     )
+                    onContinue(updatedInfo)
                 },
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Finalizar")
+                Text("Guardar")
             }
         }
     }
