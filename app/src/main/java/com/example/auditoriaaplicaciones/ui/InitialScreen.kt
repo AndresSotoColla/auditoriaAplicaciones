@@ -638,7 +638,6 @@ fun FormularioAuditoriaScreen(
     onBack: () -> Unit,
     onContinue: (AuditoriaInfo) -> Unit
 ) {
-    val context = LocalContext.current
     var operador by rememberSaveable { mutableStateOf(info.operador) }
     var codTractor by rememberSaveable { mutableStateOf(info.codTractor) }
     var codImplemento by rememberSaveable { mutableStateOf(info.codImplemento) }
@@ -668,12 +667,11 @@ fun FormularioAuditoriaScreen(
     }
 
     // --- Lógica Medición GPS ---
+    val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var isMeasuring by rememberSaveable { mutableStateOf(false) }
     var startTime by rememberSaveable { mutableStateOf(0L) }
     
-    // Location objects are not Parcelable in the way rememberSaveable likes natively in some versions,
-    // so we store coordinates manually to be safe on rotation!
     var startLat by rememberSaveable { mutableStateOf(0.0) }
     var startLng by rememberSaveable { mutableStateOf(0.0) }
     var startAcc by rememberSaveable { mutableStateOf(0f) }
@@ -746,61 +744,91 @@ fun FormularioAuditoriaScreen(
 
                 Text(text = "Detalles de Auditoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
 
-        // --- Form Fields ---
-        OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                // --- Form Fields ---
+                OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = codTractor, onValueChange = { codTractor = it }, label = { Text("Cód. Tractor") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = formula, onValueChange = { formula = it }, label = { Text("Fórmula a aplicar") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = codTractor, onValueChange = { codTractor = it }, label = { Text("Cód. Tractor") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-            OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-        }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-            OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-        }
+                // --- Botón de Video Demostrativo ---
+                var showDemoVideo by rememberSaveable { mutableStateOf(false) }
+                Button(
+                    onClick = { showDemoVideo = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4169E1), contentColor = Color.White)
+                ) {
+                    Icon(Icons.Default.PlayCircle, contentDescription = "Video", modifier = Modifier.padding(end = 8.dp))
+                    Text("VIDEO DEMOSTRATIVO", fontWeight = FontWeight.Bold)
+                }
 
-        OutlinedTextField(value = formula, onValueChange = { formula = it }, label = { Text("Fórmula a aplicar") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-            OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-        }
+                if (showDemoVideo) {
+                    androidx.compose.ui.window.Dialog(onDismissRequest = { showDemoVideo = false }) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp, max = 600.dp)
+                        ) {
+                            val exoPlayer = remember {
+                                ExoPlayer.Builder(context).build().apply {
+                                    val uri = Uri.parse("android.resource://${context.packageName}/raw/demo_video")
+                                    setMediaItem(MediaItem.fromUri(uri))
+                                    playWhenReady = true
+                                    prepare()
+                                }
+                            }
+                            DisposableEffect(Unit) {
+                                onDispose { exoPlayer.release() }
+                            }
+                            AndroidView(
+                                factory = {
+                                    PlayerView(it).apply {
+                                        player = exoPlayer
+                                        useController = true
+                                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize().background(Color.Black)
+                            )
+                        }
+                    }
+                }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
                 // --- Boquillas Aleatorias ---
                 Text(text = "Brazo Izquierdo (Aleatorio 1-30)", fontWeight = FontWeight.Bold, color = Color.Black)
-        leftNozzles.forEachIndexed { index, nozzle ->
-            Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = nozzle.volumen,
-                    onValueChange = { newVal -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newVal) } },
-                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                )
-                OutlinedTextField(
-                    value = nozzle.presion,
-                    onValueChange = { newVal -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newVal) } },
-                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                )
-            }
+                leftNozzles.forEachIndexed { index, nozzle ->
+                    Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
+                    OutlinedTextField(
+                        value = nozzle.volumen,
+                        onValueChange = { newValue -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newValue) } },
+                        label = { Text("Volumen (ml)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = nozzle.presion,
+                        onValueChange = { newValue -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newValue) } },
+                        label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+                    )
                 }
 
                 Text(text = "Brazo Derecho (Aleatorio 31-60)", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 16.dp))
-        rightNozzles.forEachIndexed { index, nozzle ->
-            Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = nozzle.volumen,
-                    onValueChange = { newVal -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newVal) } },
-                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                )
-                OutlinedTextField(
-                    value = nozzle.presion,
-                    onValueChange = { newVal -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newVal) } },
-                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                )
-            }
+                rightNozzles.forEachIndexed { index, nozzle ->
+                    Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
+                    OutlinedTextField(
+                        value = nozzle.volumen,
+                        onValueChange = { newValue -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newValue) } },
+                        label = { Text("Volumen (ml)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = nozzle.presion,
+                        onValueChange = { newValue -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newValue) } },
+                        label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+                    )
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
