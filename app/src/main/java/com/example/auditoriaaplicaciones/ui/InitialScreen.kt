@@ -34,6 +34,8 @@ import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 // Deleted Parcelize import
 import java.text.SimpleDateFormat
 import java.util.*
@@ -45,6 +47,8 @@ import java.io.Serializable
 data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Serializable
 
 data class AuditoriaInfo(
+    var id: String = UUID.randomUUID().toString(),
+    var tipoAuditoria: String = "",
     var evaluador: String = "",
     var fecha: Long = System.currentTimeMillis(),
     var hora: String = "",
@@ -104,8 +108,8 @@ fun InitialScreen(
                 "Menu" -> {
                     MainMenu(
                         onAuditoriaClick = { showSelectionDialog = true },
-                        onHistorialClick = onHistorialClick,
-                        onDescargarExcelClick = onDescargarExcelClick
+                        onHistorialClick = { currentScreen = "Historial" },
+                        onDescargarExcelClick = { ExportManager.exportToExcel(context) }
                     )
 
                     if (showSelectionDialog) {
@@ -113,12 +117,19 @@ fun InitialScreen(
                             onDismiss = { showSelectionDialog = false },
                             onOptionSelected = { option ->
                                 showSelectionDialog = false
-                                if (option == "Spray Boom") {
+                                auditoriaInfo = AuditoriaInfo(tipoAuditoria = option)
+                                if (option == "Spray Boom" || option == "Mezclas") {
+                                    // For now both route into the same question line to reuse the UI
                                     currentScreen = "SprayBoom"
                                 }
                             }
                         )
                     }
+                }
+                "Historial" -> {
+                    HistorialScreen(
+                        onBack = { currentScreen = "Menu" }
+                    )
                 }
                 "SprayBoom" -> {
                     SprayBoomChecklist(
@@ -143,6 +154,7 @@ fun InitialScreen(
                         onBack = { currentScreen = "DatosGenerales" },
                         onContinue = { finalInfo ->
                             auditoriaInfo = finalInfo
+                            StorageManager.saveAuditoria(context, finalInfo)
                             Toast.makeText(context, "¡Auditoría Guardada Completamente!", Toast.LENGTH_LONG).show()
                             currentScreen = "Menu" // Vuelve al menú con éxito
                         }
@@ -967,5 +979,234 @@ fun InitialScreenPreview() {
             onHistorialClick = {},
             onDescargarExcelClick = {}
         )
+    }
+}
+
+// --- DataManager ---
+object StorageManager {
+    private const val PREFS_NAME = "auditoria_prefs"
+    private const val KEY_AUDITS = "saved_audits"
+
+    fun saveAuditoria(context: android.content.Context, auditoria: AuditoriaInfo) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val audits = getAuditorias(context).toMutableList()
+        // If updating an existing one, remove it first
+        audits.removeAll { it.id == auditoria.id }
+        audits.add(auditoria)
+        
+        prefs.edit().putString(KEY_AUDITS, Gson().toJson(audits)).apply()
+    }
+
+    fun getAuditorias(context: android.content.Context): List<AuditoriaInfo> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val json = prefs.getString(KEY_AUDITS, null)
+        if (json.isNullOrEmpty()) return emptyList()
+        val type = object : TypeToken<List<AuditoriaInfo>>() {}.type
+        return Gson().fromJson(json, type)
+    }
+
+    fun deleteAuditoria(context: android.content.Context, id: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val audits = getAuditorias(context).toMutableList()
+        audits.removeAll { it.id == id }
+        prefs.edit().putString(KEY_AUDITS, Gson().toJson(audits)).apply()
+    }
+}
+
+// --- HistorialScreen ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistorialScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    var audits by remember { mutableStateOf(StorageManager.getAuditorias(context)) }
+    var filterMode by remember { mutableStateOf("TODOS") } // "TODOS", "Spray Boom", "Mezclas"
+
+    val displayedAudits = if (filterMode == "TODOS") {
+        audits
+    } else {
+        audits.filter { it.tipoAuditoria == filterMode }
+    }
+
+    var auditToDelete by remember { mutableStateOf<String?>(null) }
+
+    if (auditToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { auditToDelete = null },
+            title = { Text("Eliminar Muestreo") },
+            text = { Text("¿Estás seguro de que deseas eliminar este muestreo permanentemente?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        StorageManager.deleteAuditoria(context, auditToDelete!!)
+                        audits = StorageManager.getAuditorias(context)
+                        Toast.makeText(context, "Muestreo Eliminado", Toast.LENGTH_SHORT).show()
+                        auditToDelete = null
+                    }
+                ) {
+                    Text("Eliminar", color = androidx.compose.ui.graphics.Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { auditToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+            }
+            Text("Historial de Muestreos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            FilterChip(
+                selected = filterMode == "TODOS",
+                onClick = { filterMode = "TODOS" },
+                label = { Text("Todos") }
+            )
+            FilterChip(
+                selected = filterMode == "Spray Boom",
+                onClick = { filterMode = "Spray Boom" },
+                label = { Text("Spray Boom") }
+            )
+            FilterChip(
+                selected = filterMode == "Mezclas",
+                onClick = { filterMode = "Mezclas" },
+                label = { Text("Mezclas") }
+            )
+        }
+
+        if (displayedAudits.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                Text("No hay muestreos guardados.", color = androidx.compose.ui.graphics.Color.Gray)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(displayedAudits.size) { index ->
+                    val audit = displayedAudits[index]
+                    val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(audit.fecha))
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "${audit.tipoAuditoria} - Finca: ${audit.finca}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text(text = "Fecha: $dateStr - Lote: ${audit.lote}", fontSize = 14.sp)
+                                Text(text = "Evaluador: ${audit.evaluador}", fontSize = 14.sp)
+                            }
+                            IconButton(onClick = { auditToDelete = audit.id }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = androidx.compose.ui.graphics.Color.Red)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Excel Manager ---
+object ExportManager {
+    fun exportToExcel(context: android.content.Context) {
+        val audits = StorageManager.getAuditorias(context)
+        if (audits.isEmpty()) {
+            Toast.makeText(context, "No hay datos para exportar.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val workbook = org.apache.poi.xssf.usermodel.XSSFWorkbook()
+            
+            // Sheet 1: Spray Boom
+            val sbSheet = workbook.createSheet("Spray Boom")
+            val mezclasSheet = workbook.createSheet("Mezclas")
+
+            val headers = arrayOf(
+                "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", "Operador", 
+                "CodTractor", "CodImplemento", "PotTractor", "PotTDF", "Formula", 
+                "Presion", "Volumen", "Velocidad GPS", "Distancia GPS",
+                "BoquillasTapadas", "NumTapadas", "PresenciaPersonal", "AlturaUniforme", 
+                "EstadoVia", "PapelHidro", "Gotas1cm2", "Gotas1/4cm2"
+            )
+
+            // Setup Spray Boom Sheet
+            var row0 = sbSheet.createRow(0)
+            headers.forEachIndexed { i, h -> row0.createCell(i).setCellValue(h) }
+            
+            // Setup Mezclas Sheet
+            var mRow0 = mezclasSheet.createRow(0)
+            headers.forEachIndexed { i, h -> mRow0.createCell(i).setCellValue(h) }
+
+            var sbRowIdx = 1
+            var mRowIdx = 1
+
+            for (audit in audits) {
+                val sheet = if (audit.tipoAuditoria == "Mezclas") mezclasSheet else sbSheet
+                val rowIdx = if (audit.tipoAuditoria == "Mezclas") mRowIdx++ else sbRowIdx++
+                val row = sheet.createRow(rowIdx)
+                
+                val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(audit.fecha))
+                
+                row.createCell(0).setCellValue(audit.id)
+                row.createCell(1).setCellValue(dateStr)
+                row.createCell(2).setCellValue(audit.hora)
+                row.createCell(3).setCellValue(audit.evaluador)
+                row.createCell(4).setCellValue(audit.finca)
+                row.createCell(5).setCellValue(audit.lote)
+                row.createCell(6).setCellValue(audit.operador)
+                row.createCell(7).setCellValue(audit.codTractor)
+                row.createCell(8).setCellValue(audit.codImplemento)
+                row.createCell(9).setCellValue(audit.potenciaTractor)
+                row.createCell(10).setCellValue(audit.potenciaTdf)
+                row.createCell(11).setCellValue(audit.formula)
+                row.createCell(12).setCellValue(audit.presion)
+                row.createCell(13).setCellValue(audit.volumen)
+                row.createCell(14).setCellValue(audit.velocidadKmh.toString())
+                row.createCell(15).setCellValue(audit.distanciaMetros.toString())
+                
+                row.createCell(16).setCellValue(if (audit.boquillasTapadas == true) "SI" else if (audit.boquillasTapadas == false) "NO" else "")
+                row.createCell(17).setCellValue(audit.boquillasTapadasNum)
+                row.createCell(18).setCellValue(if (audit.presenciaPersonal == true) "SI" else if (audit.presenciaPersonal == false) "NO" else "")
+                row.createCell(19).setCellValue(if (audit.alturaUniforme == true) "SI" else if (audit.alturaUniforme == false) "NO" else "")
+                row.createCell(20).setCellValue(audit.estadoVia)
+                row.createCell(21).setCellValue(if (audit.papelHidrosensible) "SI" else "NO")
+                row.createCell(22).setCellValue(audit.papelGotas1cm)
+                row.createCell(23).setCellValue(audit.papelGotasCuarto)
+            }
+
+            // Save to Downloads directory
+            val fileName = "Auditorias_${System.currentTimeMillis()}.xlsx"
+            val resolver = context.contentResolver
+            val contentValues = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+            }
+
+            val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            if (uri != null) {
+                resolver.openOutputStream(uri)?.use { outputStream ->
+                    workbook.write(outputStream)
+                }
+                workbook.close()
+                Toast.makeText(context, "Excel guardado en Descargas: $fileName", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "Error: No se pudo crear el archivo en Descargas.", Toast.LENGTH_LONG).show()
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Error exportando Excel: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 }
