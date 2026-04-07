@@ -55,52 +55,62 @@ fun InitialScreen(
     var auditoriaInfo by remember { mutableStateOf(AuditoriaInfo()) }
     val context = LocalContext.current
 
-    Box(modifier = modifier.fillMaxSize()) {
-        when (currentScreen) {
-            "Menu" -> {
-                MainMenu(
-                    onAuditoriaClick = { showSelectionDialog = true },
-                    onHistorialClick = onHistorialClick,
-                    onDescargarExcelClick = onDescargarExcelClick
-                )
+    Column(modifier = modifier.fillMaxSize()) {
+        // DEBUG TEXT VISIBLE EN PANTALLA
+        Text(
+            text = "DEBUG INFO -> Pantalla Actual: $currentScreen",
+            color = androidx.compose.ui.graphics.Color.Red,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(8.dp).background(androidx.compose.ui.graphics.Color.Yellow)
+        )
 
-                if (showSelectionDialog) {
-                    SelectionDialog(
-                        onDismiss = { showSelectionDialog = false },
-                        onOptionSelected = { option ->
-                            showSelectionDialog = false
-                            if (option == "Spray Boom") {
-                                currentScreen = "SprayBoom"
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when (currentScreen) {
+                "Menu" -> {
+                    MainMenu(
+                        onAuditoriaClick = { showSelectionDialog = true },
+                        onHistorialClick = onHistorialClick,
+                        onDescargarExcelClick = onDescargarExcelClick
+                    )
+
+                    if (showSelectionDialog) {
+                        SelectionDialog(
+                            onDismiss = { showSelectionDialog = false },
+                            onOptionSelected = { option ->
+                                showSelectionDialog = false
+                                if (option == "Spray Boom") {
+                                    currentScreen = "SprayBoom"
+                                }
                             }
+                        )
+                    }
+                }
+                "SprayBoom" -> {
+                    SprayBoomChecklist(
+                        onBack = { currentScreen = "Menu" },
+                        onContinue = { currentScreen = "DatosGenerales" }
+                    )
+                }
+                "DatosGenerales" -> {
+                    DatosGeneralesScreen(
+                        onBack = { currentScreen = "SprayBoom" },
+                        onContinue = { info ->
+                            Toast.makeText(context, "Navigating to Formulario...", Toast.LENGTH_SHORT).show()
+                            auditoriaInfo = info
+                            currentScreen = "FormularioAuditoria"
                         }
                     )
                 }
-            }
-            "SprayBoom" -> {
-                SprayBoomChecklist(
-                    onBack = { currentScreen = "Menu" },
-                    onContinue = { currentScreen = "DatosGenerales" }
-                )
-            }
-            "DatosGenerales" -> {
-                DatosGeneralesScreen(
-                    onBack = { currentScreen = "SprayBoom" },
-                    onContinue = { info ->
-                        Toast.makeText(context, "Navigating to Formulario...", Toast.LENGTH_SHORT).show()
-                        auditoriaInfo = info
-                        currentScreen = "FormularioAuditoria"
-                    }
-                )
-            }
-            "FormularioAuditoria" -> {
-                FormularioAuditoriaScreen(
-                    info = auditoriaInfo,
-                    onBack = { currentScreen = "DatosGenerales" },
-                    onContinue = { finalInfo ->
-                        auditoriaInfo = finalInfo
-                        /* Continuar a la siguiente lógica */
-                    }
-                )
+                "FormularioAuditoria" -> {
+                    FormularioAuditoriaScreen(
+                        info = auditoriaInfo,
+                        onBack = { currentScreen = "DatosGenerales" },
+                        onContinue = { finalInfo ->
+                            auditoriaInfo = finalInfo
+                            /* Continuar a la siguiente lógica */
+                        }
+                    )
+                }
             }
         }
     }
@@ -275,6 +285,7 @@ fun DatosGeneralesScreen(
     var showTimePicker by remember { mutableStateOf(false) }
     var lote by remember { mutableStateOf("") }
     var finca by remember { mutableStateOf("") }
+    var debugErrorMsg by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
@@ -411,7 +422,23 @@ fun DatosGeneralesScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // MOSTRAR ERRORES EN PANTALLA
+        if (debugErrorMsg.isNotEmpty()) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = debugErrorMsg,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(16.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -426,11 +453,13 @@ fun DatosGeneralesScreen(
             Button(
                 onClick = {
                     val loteNum = lote.toIntOrNull() ?: 0
+                    
                     if (evaluador.isBlank() || finca.isBlank() || lote.isBlank()) {
-                        Toast.makeText(context, "Por favor complete todos los campos", Toast.LENGTH_SHORT).show()
+                        debugErrorMsg = "ERROR: Faltan campos básicos.\nEvaluador='${evaluador}'\nFinca='${finca}'\nLote='${lote}'"
                     } else if (loteNum !in 1..87) {
-                        Toast.makeText(context, "El lote debe estar entre 1 y 87", Toast.LENGTH_SHORT).show()
+                        debugErrorMsg = "ERROR: Lote '${lote}' (numeral=$loteNum) no está entre 1 y 87."
                     } else {
+                        debugErrorMsg = "Navegando a FormularioAuditoria..."
                         onContinue(
                             AuditoriaInfo(
                                 evaluador = evaluador,
