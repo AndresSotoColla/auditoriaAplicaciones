@@ -104,6 +104,9 @@ fun blackTextFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedBorderColor = Color.Black,
     focusedLabelColor = Color.Black,
     unfocusedLabelColor = Color.Black,
+    disabledTextColor = Color.Black,
+    disabledBorderColor = Color.Black,
+    disabledLabelColor = Color.Black,
     cursorColor = Color.Black
 )
 
@@ -529,11 +532,6 @@ fun DatosGeneralesScreen(
             trailingIcon = {
                 Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
             },
-            colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledBorderColor = MaterialTheme.colorScheme.outline
-            ),
             shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
@@ -549,11 +547,6 @@ fun DatosGeneralesScreen(
             trailingIcon = {
                 Icon(Icons.Default.Schedule, contentDescription = "Seleccionar hora")
             },
-            colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledBorderColor = MaterialTheme.colorScheme.outline
-            ),
             shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
