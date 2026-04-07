@@ -837,9 +837,10 @@ fun FormularioAuditoriaScreen(
                     
                     val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
-                        ExposedDropdownMenu(
+                        DropdownMenu(
                             expanded = expandedFormula,
-                            onDismissRequest = { expandedFormula = false }
+                            onDismissRequest = { expandedFormula = false },
+                            modifier = Modifier.exposedDropdownSize()
                         ) {
                             filteredCodigos.forEach { cod ->
                                 DropdownMenuItem(
@@ -1562,9 +1563,10 @@ fun FormularioMezclasScreen(
                     
                     val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
-                        ExposedDropdownMenu(
+                        DropdownMenu(
                             expanded = expandedFormula,
-                            onDismissRequest = { expandedFormula = false }
+                            onDismissRequest = { expandedFormula = false },
+                            modifier = Modifier.exposedDropdownSize()
                         ) {
                             filteredCodigos.forEach { cod ->
                                 DropdownMenuItem(
@@ -1632,3 +1634,4 @@ fun FormularioMezclasScreen(
         }
     }
 }
+
