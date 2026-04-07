@@ -58,6 +58,7 @@ import java.io.Serializable
 
 // Para soportar guardado de estado ante rotaciones, los usamos como Serializable
 data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Serializable
+data class ProductoEvaluado(val producto: String, var cumple: Boolean = true, var reemplazo: String = "") : Serializable
 
 data class InsumoData(
     val codigo: String,
@@ -112,6 +113,14 @@ data class AuditoriaInfo(
     
     var mezclador: String = "",
     var formulaMezclar: String = "",
+    var productosEvaluados: List<ProductoEvaluado> = emptyList(),
+    var incompatibilidad: Boolean = false,
+    var ordenMezclado: Boolean = true,
+    var obsOrdenMezclado: String = "",
+    var usaEpp: Boolean = true,
+    var obsEpp: String = "",
+    var tanqueLimpio: Boolean = true,
+    var obsTanqueLimpio: String = "",
     
     // Boquillas
     var nozzlesIzquierdo: List<NozzleData> = emptyList(),
@@ -1396,6 +1405,12 @@ object ExportManager {
                 "BoquillasTapadas", "NumTapadas", "PresenciaPersonal", "AlturaUniforme", 
                 "EstadoVia", "PapelHidro", "Gotas1cm2", "Gotas1/4cm2"
             )
+            
+            val mezclasHeaders = arrayOf(
+                "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", "Mezclador", "Formula",
+                "Productos Evaluados (JSON)", "Incompatibilidad", "Respeta Orden", "Obs Orden",
+                "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque"
+            )
 
             // Setup Spray Boom Sheet
             var row0 = sbSheet.createRow(0)
@@ -1403,17 +1418,36 @@ object ExportManager {
             
             // Setup Mezclas Sheet
             var mRow0 = mezclasSheet.createRow(0)
-            headers.forEachIndexed { i, h -> mRow0.createCell(i).setCellValue(h) }
+            mezclasHeaders.forEachIndexed { i, h -> mRow0.createCell(i).setCellValue(h) }
 
             var sbRowIdx = 1
             var mRowIdx = 1
 
             for (audit in audits) {
-                val sheet = if (audit.tipoAuditoria == "Mezclas") mezclasSheet else sbSheet
-                val rowIdx = if (audit.tipoAuditoria == "Mezclas") mRowIdx++ else sbRowIdx++
-                val row = sheet.createRow(rowIdx)
-                
                 val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(audit.fecha))
+                
+                if (audit.tipoAuditoria == "Mezclas") {
+                    val row = mezclasSheet.createRow(mRowIdx++)
+                    row.createCell(0).setCellValue(audit.id)
+                    row.createCell(1).setCellValue(dateStr)
+                    row.createCell(2).setCellValue(audit.hora)
+                    row.createCell(3).setCellValue(audit.evaluador)
+                    row.createCell(4).setCellValue(audit.finca)
+                    row.createCell(5).setCellValue(audit.lote)
+                    row.createCell(6).setCellValue(audit.mezclador)
+                    row.createCell(7).setCellValue(audit.formulaMezclar)
+                    
+                    val jsonProductos = com.google.gson.Gson().toJson(audit.productosEvaluados)
+                    row.createCell(8).setCellValue(jsonProductos)
+                    row.createCell(9).setCellValue(if (audit.incompatibilidad) "SI" else "NO")
+                    row.createCell(10).setCellValue(if (audit.ordenMezclado) "SI" else "NO")
+                    row.createCell(11).setCellValue(audit.obsOrdenMezclado)
+                    row.createCell(12).setCellValue(if (audit.usaEpp) "SI" else "NO")
+                    row.createCell(13).setCellValue(audit.obsEpp)
+                    row.createCell(14).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
+                    row.createCell(15).setCellValue(audit.obsTanqueLimpio)
+                } else {
+                    val row = sbSheet.createRow(sbRowIdx++)
                 
                 row.createCell(0).setCellValue(audit.id)
                 row.createCell(1).setCellValue(dateStr)
@@ -1440,6 +1474,7 @@ object ExportManager {
                 row.createCell(21).setCellValue(if (audit.papelHidrosensible) "SI" else "NO")
                 row.createCell(22).setCellValue(audit.papelGotas1cm)
                 row.createCell(23).setCellValue(audit.papelGotasCuarto)
+                }
             }
 
             // Save to Downloads directory
@@ -1495,6 +1530,21 @@ fun FormularioMezclasScreen(
 
     val selectedInsumos = remember(formula, insumosList) {
         insumosList.filter { it.codigo == formula }.sortedBy { it.numero }
+    }
+    
+    var productosEvaluados by remember { mutableStateOf(info.productosEvaluados) }
+    var incompatibilidad by rememberSaveable { mutableStateOf(info.incompatibilidad) }
+    var ordenMezclado by rememberSaveable { mutableStateOf(info.ordenMezclado) }
+    var obsOrdenMezclado by rememberSaveable { mutableStateOf(info.obsOrdenMezclado) }
+    var usaEpp by rememberSaveable { mutableStateOf(info.usaEpp) }
+    var obsEpp by rememberSaveable { mutableStateOf(info.obsEpp) }
+    var tanqueLimpio by rememberSaveable { mutableStateOf(info.tanqueLimpio) }
+    var obsTanqueLimpio by rememberSaveable { mutableStateOf(info.obsTanqueLimpio) }
+
+    LaunchedEffect(selectedInsumos) {
+        if (productosEvaluados.isEmpty() || selectedInsumos.map { it.insumo } != productosEvaluados.map { it.producto }) {
+            productosEvaluados = selectedInsumos.map { ProductoEvaluado(producto = it.insumo) }
+        }
     }
     
     val dateFormatter = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
@@ -1583,13 +1633,12 @@ fun FormularioMezclasScreen(
 
                 // Table of components
                 if (selectedInsumos.isNotEmpty()) {
-                    Text(text = "Componentes de la Fórmula:", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 8.dp))
+                    Text(text = "Componentes de la Fórmula:", fontWeight = FontWeight.Bold, color = Color.Black)
                     
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
@@ -1597,7 +1646,7 @@ fun FormularioMezclasScreen(
                                 Text("Cantidad", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 Text("Unidad", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             }
-                            HorizontalDivider(color = Color.Black.copy(alpha = 0.5f))
+                            androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.5f))
                             
                             selectedInsumos.forEach { insumo ->
                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -1605,7 +1654,135 @@ fun FormularioMezclasScreen(
                                     Text(insumo.cantidad, modifier = Modifier.weight(1f), fontSize = 12.sp)
                                     Text(insumo.unidad, modifier = Modifier.weight(1f), fontSize = 12.sp)
                                 }
-                                HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
+                                androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "Validación de Productos:", fontWeight = FontWeight.Bold, color = Color.Black)
+
+                    productosEvaluados.forEachIndexed { index, pe ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(pe.producto, fontWeight = FontWeight.Bold)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("¿Se aplicó este producto?")
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    RadioButton(selected = pe.cumple, onClick = {
+                                        val m = productosEvaluados.toMutableList()
+                                        m[index] = pe.copy(cumple = true)
+                                        productosEvaluados = m
+                                    })
+                                    Text("Sí")
+                                    RadioButton(selected = !pe.cumple, onClick = {
+                                        val m = productosEvaluados.toMutableList()
+                                        m[index] = pe.copy(cumple = false)
+                                        productosEvaluados = m
+                                    })
+                                    Text("No")
+                                }
+                                if (!pe.cumple) {
+                                    OutlinedTextField(
+                                        value = pe.reemplazo,
+                                        onValueChange = { 
+                                            val m = productosEvaluados.toMutableList()
+                                            m[index] = pe.copy(reemplazo = it)
+                                            productosEvaluados = m
+                                        },
+                                        label = { Text("Producto reemplazo") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = blackTextFieldColors(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Incompatibilidad
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Se genera incompatibilidad?", fontWeight = FontWeight.Bold, color = Color.Black)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = incompatibilidad, onClick = { incompatibilidad = true })
+                                Text("Sí", color = Color.Black)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                RadioButton(selected = !incompatibilidad, onClick = { incompatibilidad = false })
+                                Text("No", color = Color.Black)
+                            }
+                        }
+                    }
+
+                    // Orden de Mezclado
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Se respeta el orden de mezclado?", fontWeight = FontWeight.Bold, color = Color.Black)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = ordenMezclado, onClick = { ordenMezclado = true })
+                                Text("Sí", color = Color.Black)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                RadioButton(selected = !ordenMezclado, onClick = { ordenMezclado = false })
+                                Text("No", color = Color.Black)
+                            }
+                            if (!ordenMezclado) {
+                                OutlinedTextField(
+                                    value = obsOrdenMezclado,
+                                    onValueChange = { obsOrdenMezclado = it },
+                                    label = { Text("Observación orden de mezclado") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = blackTextFieldColors()
+                                )
+                            }
+                        }
+                    }
+
+                    // Uso de EPP
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Operario usa EPP?", fontWeight = FontWeight.Bold, color = Color.Black)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = usaEpp, onClick = { usaEpp = true })
+                                Text("Sí", color = Color.Black)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                RadioButton(selected = !usaEpp, onClick = { usaEpp = false })
+                                Text("No", color = Color.Black)
+                            }
+                            if (!usaEpp) {
+                                OutlinedTextField(
+                                    value = obsEpp,
+                                    onValueChange = { obsEpp = it },
+                                    label = { Text("Observación uso EPP") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = blackTextFieldColors()
+                                )
+                            }
+                        }
+                    }
+
+                    // Tanque limpio
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Tanque limpio?", fontWeight = FontWeight.Bold, color = Color.Black)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = tanqueLimpio, onClick = { tanqueLimpio = true })
+                                Text("Sí", color = Color.Black)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                RadioButton(selected = !tanqueLimpio, onClick = { tanqueLimpio = false })
+                                Text("No", color = Color.Black)
+                            }
+                            if (!tanqueLimpio) {
+                                OutlinedTextField(
+                                    value = obsTanqueLimpio,
+                                    onValueChange = { obsTanqueLimpio = it },
+                                    label = { Text("Observación tanque limpio") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = blackTextFieldColors()
+                                )
                             }
                         }
                     }
@@ -1620,7 +1797,15 @@ fun FormularioMezclasScreen(
                         onClick = {
                             val updatedInfo = info.copy(
                                 mezclador = mezclador,
-                                formulaMezclar = formula
+                                formulaMezclar = formula,
+                                productosEvaluados = productosEvaluados,
+                                incompatibilidad = incompatibilidad,
+                                ordenMezclado = ordenMezclado,
+                                obsOrdenMezclado = obsOrdenMezclado,
+                                usaEpp = usaEpp,
+                                obsEpp = obsEpp,
+                                tanqueLimpio = tanqueLimpio,
+                                obsTanqueLimpio = obsTanqueLimpio
                             )
                             onContinue(updatedInfo)
                         },
