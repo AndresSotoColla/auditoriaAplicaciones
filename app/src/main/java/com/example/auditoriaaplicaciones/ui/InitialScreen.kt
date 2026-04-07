@@ -62,8 +62,10 @@ data class NozzleData(val id: Int, var volumen: String = "", var presion: String
 data class InsumoData(
     val codigo: String,
     val descripcion: String,
+    val numero: Int,
     val insumo: String,
-    val cantidad: String
+    val cantidad: String,
+    val unidad: String
 )
 
 fun parseCsv(context: android.content.Context): List<InsumoData> {
@@ -74,12 +76,14 @@ fun parseCsv(context: android.content.Context): List<InsumoData> {
         reader.readLine() // drop header
         reader.forEachLine { line ->
             val tokens = line.split(";")
-            if (tokens.size >= 5) {
+            if (tokens.size >= 6) {
                 list.add(InsumoData(
                     codigo = tokens[0],
                     descripcion = tokens[1],
+                    numero = tokens[2].toIntOrNull() ?: 0,
                     insumo = tokens[3],
-                    cantidad = tokens[4]
+                    cantidad = tokens[4],
+                    unidad = tokens[5]
                 ))
             }
         }
@@ -105,6 +109,9 @@ data class AuditoriaInfo(
     var formula: String = "",
     var presion: String = "",
     var volumen: String = "",
+    
+    var mezclador: String = "",
+    var formulaMezclar: String = "",
     
     // Boquillas
     var nozzlesIzquierdo: List<NozzleData> = emptyList(),
@@ -242,9 +249,13 @@ fun InitialScreen(
                             else currentScreen = "SprayBoom"
                         },
                         onContinue = { info ->
-                            Toast.makeText(context, "Navigating to Formulario...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Navegando a Formulario...", Toast.LENGTH_SHORT).show()
                             auditoriaInfo = info
-                            currentScreen = "FormularioAuditoria"
+                            if (info.tipoAuditoria == "Mezclas") {
+                                currentScreen = "FormularioMezclas"
+                            } else {
+                                currentScreen = "FormularioAuditoria"
+                            }
                         }
                     )
                 }
@@ -255,8 +266,20 @@ fun InitialScreen(
                         onContinue = { finalInfo ->
                             auditoriaInfo = finalInfo
                             StorageManager.saveAuditoria(context, finalInfo)
-                            Toast.makeText(context, "¡Auditoría Guardada Completamente!", Toast.LENGTH_LONG).show()
-                            currentScreen = "Menu" // Vuelve al menú con éxito
+                            Toast.makeText(context, "¡Auditoría Guardada!", Toast.LENGTH_LONG).show()
+                            currentScreen = "Menu"
+                        }
+                    )
+                }
+                "FormularioMezclas" -> {
+                    FormularioMezclasScreen(
+                        info = auditoriaInfo,
+                        onBack = { currentScreen = "DatosGenerales" },
+                        onContinue = { finalInfo ->
+                            auditoriaInfo = finalInfo
+                            StorageManager.saveAuditoria(context, finalInfo)
+                            Toast.makeText(context, "¡Auditoría de Mezclas Guardada!", Toast.LENGTH_LONG).show()
+                            currentScreen = "Menu"
                         }
                     )
                 }
@@ -1436,6 +1459,162 @@ object ExportManager {
                 )
                 Uri.fromFile(file)
             }
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun FormularioMezclasScreen(
+    info: AuditoriaInfo,
+    onBack: () -> Unit,
+    onContinue: (AuditoriaInfo) -> Unit
+) {
+    var mezclador by rememberSaveable { mutableStateOf(info.mezclador) }
+    var formula by rememberSaveable { mutableStateOf(info.formulaMezclar) }
+
+    val context = LocalContext.current
+    val insumosList = remember { parseCsv(context) }
+    val codigosUnicos = remember(insumosList) { insumosList.map { it.codigo }.distinct() }
+    var expandedFormula by rememberSaveable { mutableStateOf(false) }
+
+    val selectedInsumos = remember(formula, insumosList) {
+        insumosList.filter { it.codigo == formula }.sortedBy { it.numero }
+    }
+    
+    val dateFormatter = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
+
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header (General Info)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Información General", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Eval: ${info.evaluador}", fontSize = 14.sp)
+                            Text("Finca: ${info.finca}", fontSize = 14.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Fecha: ${dateFormatter.format(java.util.Date(info.fecha))}", fontSize = 14.sp)
+                            Text("Hora: ${info.hora}", fontSize = 14.sp)
+                        }
+                        Text("Lote: ${info.lote}", fontSize = 14.sp)
+                    }
+                }
+
+                // Inputs
+                OutlinedTextField(
+                    value = mezclador,
+                    onValueChange = { mezclador = it },
+                    label = { Text("Nombre Mezclador") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                androidx.compose.material3.ExposedDropdownMenuBox(
+                    expanded = expandedFormula,
+                    onExpandedChange = { expandedFormula = !expandedFormula },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = formula,
+                        onValueChange = { 
+                            formula = it
+                            expandedFormula = true
+                        },
+                        label = { Text("Fórmula a mezclar") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                    
+                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
+                    if (filteredCodigos.isNotEmpty() && expandedFormula) {
+                        androidx.compose.material3.ExposedDropdownMenu(
+                            expanded = expandedFormula,
+                            onDismissRequest = { expandedFormula = false }
+                        ) {
+                            filteredCodigos.forEach { cod ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        formula = cod
+                                        expandedFormula = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Table of components
+                if (selectedInsumos.isNotEmpty()) {
+                    Text(text = "Componentes de la Fórmula:", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 8.dp))
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                                Text("Insumo", fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
+                                Text("Cantidad", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Text("Unidad", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            }
+                            HorizontalDivider(color = Color.Black.copy(alpha = 0.5f))
+                            
+                            selectedInsumos.forEach { insumo ->
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                    Text(insumo.insumo, modifier = Modifier.weight(2f), fontSize = 12.sp)
+                                    Text(insumo.cantidad, modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                    Text(insumo.unidad, modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                }
+                                HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
+                            }
+                        }
+                    }
+                }
+
+                // Footers: Volver y Guardar
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)) {
+                        Text("Volver")
+                    }
+                    Button(
+                        onClick = {
+                            val updatedInfo = info.copy(
+                                mezclador = mezclador,
+                                formulaMezclar = formula
+                            )
+                            onContinue(updatedInfo)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                    ) {
+                        Text("Guardar")
+                    }
+                }
+            }
+        }
+    }
+}
             if (uri != null) {
                 resolver.openOutputStream(uri)?.use { outputStream ->
                     workbook.write(outputStream)
