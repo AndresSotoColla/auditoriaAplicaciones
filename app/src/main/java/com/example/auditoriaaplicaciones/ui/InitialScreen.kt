@@ -1,6 +1,11 @@
 package com.example.auditoriaaplicaciones.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,11 +27,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.ContextCompat
 import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.random.Random
 
 // Data class to store the audit information across screens
+data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "")
+
 data class AuditoriaInfo(
     var evaluador: String = "",
     var fecha: Long = System.currentTimeMillis(),
@@ -40,7 +52,16 @@ data class AuditoriaInfo(
     var potenciaTdf: String = "",
     var formula: String = "",
     var presion: String = "",
-    var volumen: String = ""
+    var volumen: String = "",
+    
+    // Nuevos campos para boquillas
+    var nozzlesIzquierdo: List<NozzleData> = emptyList(),
+    var nozzlesDerecho: List<NozzleData> = emptyList(),
+    
+    // GPS y Desplazamiento
+    var tiempoDesplazamientoSegundos: Long = 0,
+    var distanciaMetros: Float = 0f,
+    var velocidadKmh: Float = 0f
 )
 
 @Composable
@@ -485,16 +506,59 @@ fun FormularioAuditoriaScreen(
     onBack: () -> Unit,
     onContinue: (AuditoriaInfo) -> Unit
 ) {
-    var operador by remember { mutableStateOf("") }
-    var codTractor by remember { mutableStateOf("") }
-    var codImplemento by remember { mutableStateOf("") }
-    var potenciaTractor by remember { mutableStateOf("") }
-    var potenciaTdf by remember { mutableStateOf("") }
-    var formula by remember { mutableStateOf("") }
-    var presion by remember { mutableStateOf("") }
-    var volumen by remember { mutableStateOf("") }
-
     val context = LocalContext.current
+    var operador by remember { mutableStateOf(info.operador) }
+    var codTractor by remember { mutableStateOf(info.codTractor) }
+    var codImplemento by remember { mutableStateOf(info.codImplemento) }
+    var potenciaTractor by remember { mutableStateOf(info.potenciaTractor) }
+    var potenciaTdf by remember { mutableStateOf(info.potenciaTdf) }
+    var formula by remember { mutableStateOf(info.formula) }
+    var presion by remember { mutableStateOf(info.presion) }
+    var volumen by remember { mutableStateOf(info.volumen) }
+
+    // --- Lógica Boquillas Aleatorias ---
+    var leftNozzles by remember { mutableStateOf(info.nozzlesIzquierdo) }
+    var rightNozzles by remember { mutableStateOf(info.nozzlesDerecho) }
+
+    LaunchedEffect(Unit) {
+        if (leftNozzles.isEmpty()) {
+            val randomLeft1 = Random.nextInt(1, 31)
+            var randomLeft2 = Random.nextInt(1, 31)
+            while (randomLeft2 == randomLeft1) { randomLeft2 = Random.nextInt(1, 31) }
+            leftNozzles = listOf(NozzleData(randomLeft1), NozzleData(randomLeft2))
+        }
+        if (rightNozzles.isEmpty()) {
+            val randomRight1 = Random.nextInt(31, 61)
+            var randomRight2 = Random.nextInt(31, 61)
+            while (randomRight2 == randomRight1) { randomRight2 = Random.nextInt(31, 61) }
+            rightNozzles = listOf(NozzleData(randomRight1), NozzleData(randomRight2))
+        }
+    }
+
+    // --- Lógica Medición GPS ---
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var isMeasuring by remember { mutableStateOf(false) }
+    var startLoc by remember { mutableStateOf<Location?>(null) }
+    var endLoc by remember { mutableStateOf<Location?>(null) }
+    var startTime by remember { mutableStateOf(0L) }
+    
+    var calcDistance by remember { mutableStateOf(0f) }
+    var calcTimeSec by remember { mutableStateOf(0L) }
+    var calcSpeed by remember { mutableStateOf(0f) }
+    var calcError by remember { mutableStateOf(0f) }
+    var gpsStatus by remember { mutableStateOf("Listo para medir") }
+
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || 
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+            Toast.makeText(context, "Permiso GPS concedido. Ya puede medir.", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Permiso GPS denegado.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     Column(
@@ -525,119 +589,184 @@ fun FormularioAuditoriaScreen(
             }
         }
 
-        Text(
-            text = "Detalles de Auditoría",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 8.dp)
-        )
+        Text(text = "Detalles de Auditoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
         // --- Form Fields ---
-        OutlinedTextField(
-            value = operador,
-            onValueChange = { operador = it },
-            label = { Text("Nombre operador") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
+        OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = codTractor,
-                onValueChange = { codTractor = it },
-                label = { Text("Cód. Tractor") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = codImplemento,
-                onValueChange = { codImplemento = it },
-                label = { Text("Cód. Implemento") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            )
+            OutlinedTextField(value = codTractor, onValueChange = { codTractor = it }, label = { Text("Cód. Tractor") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = potenciaTractor,
-                onValueChange = { potenciaTractor = it },
-                label = { Text("Potencia Tractor (HP)") },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = potenciaTdf,
-                onValueChange = { potenciaTdf = it },
-                label = { Text("Potencia TDF/PPO (HP)") },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
-            )
+            OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
         }
 
-        OutlinedTextField(
-            value = formula,
-            onValueChange = { formula = it },
-            label = { Text("Fórmula a aplicar") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
+        OutlinedTextField(value = formula, onValueChange = { formula = it }, label = { Text("Fórmula a aplicar") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = presion,
-                onValueChange = { presion = it },
-                label = { Text("Presión (PSI)") },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = volumen,
-                onValueChange = { volumen = it },
-                label = { Text("Volumen aplicar") },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
-            )
+            OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // --- Boquillas Aleatorias ---
+        Text(text = "Brazo Izquierdo (Aleatorio 1-30)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+        leftNozzles.forEachIndexed { index, nozzle ->
+            Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = nozzle.volumen,
+                    onValueChange = { newVal -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newVal) } },
+                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = nozzle.presion,
+                    onValueChange = { newVal -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newVal) } },
+                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+
+        Text(text = "Brazo Derecho (Aleatorio 31-60)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 16.dp))
+        rightNozzles.forEachIndexed { index, nozzle ->
+            Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = nozzle.volumen,
+                    onValueChange = { newVal -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newVal) } },
+                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = nozzle.presion,
+                    onValueChange = { newVal -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newVal) } },
+                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // --- Medición de Desplazamiento ---
+        Text(text = "Medición de Desplazamiento (GPS)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = gpsStatus, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(bottom = 16.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    FilledTonalButton(
+                        modifier = Modifier.weight(1f),
+                        enabled = !isMeasuring,
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF4CAF50)),
+                        onClick = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                requestPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                return@FilledTonalButton
+                            }
+
+                            gpsStatus = "Obteniendo ubicación inicial..."
+                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
+                                .addOnSuccessListener { location: Location? ->
+                                    if (location != null) {
+                                        startLoc = location
+                                        startTime = System.currentTimeMillis()
+                                        isMeasuring = true
+                                        gpsStatus = "Midiendo... Camine y luego detenga."
+                                        calcError = location.accuracy
+                                    } else {
+                                        gpsStatus = "Error: Active GPS/Espere señal"
+                                    }
+                                }
+                        }
+                    ) {
+                        Text("Iniciar", color = androidx.compose.ui.graphics.Color.White)
+                    }
+
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        enabled = isMeasuring,
+                        colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
+                        onClick = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                gpsStatus = "Obteniendo ubicación final..."
+                                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
+                                    .addOnSuccessListener { location: Location? ->
+                                        if (location != null && startLoc != null) {
+                                            endLoc = location
+                                            val eTime = System.currentTimeMillis()
+                                            
+                                            // Cálculos
+                                            calcTimeSec = (eTime - startTime) / 1000
+                                            calcDistance = startLoc!!.distanceTo(location)
+                                            
+                                            // v = d(m) / t(s) * 3.6 = km/h
+                                            if (calcTimeSec > 0) {
+                                                calcSpeed = (calcDistance / calcTimeSec) * 3.6f
+                                            }
+                                            
+                                            calcError = (startLoc!!.accuracy + location.accuracy) / 2f
+                                            isMeasuring = false
+                                            gpsStatus = "Medición completada."
+                                        } else {
+                                            gpsStatus = "Error obteniendo posición final."
+                                            isMeasuring = false
+                                        }
+                                    }
+                            }
+                        }
+                    ) {
+                        Text("Detener", color = androidx.compose.ui.graphics.Color.White)
+                    }
+                }
+            }
+        }
+
+        // Resultados
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = "Tiempo: ${calcTimeSec}s")
+            Text(text = "Distancia: ${String.format(Locale.US, "%.2f", calcDistance)}m")
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = "Velocidad: ${String.format(Locale.US, "%.2f", calcSpeed)} km/h")
+            Text(text = "Margen Error: ±${String.format(Locale.US, "%.1f", calcError)}m", color = androidx.compose.ui.graphics.Color.Gray)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            OutlinedButton(
-                onClick = onBack,
-                modifier = Modifier.weight(1f)
-            ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) {
                 Text("Volver")
             }
             Button(
                 onClick = {
-                    if (operador.isBlank() || formula.isBlank() || volumen.isBlank()) {
-                        Toast.makeText(context, "Complete los campos obligatorios", Toast.LENGTH_SHORT).show()
-                    } else {
-                        onContinue(
-                            info.copy(
-                                operador = operador,
-                                codTractor = codTractor,
-                                codImplemento = codImplemento,
-                                potenciaTractor = potenciaTractor,
-                                potenciaTdf = potenciaTdf,
-                                formula = formula,
-                                presion = presion,
-                                volumen = volumen
-                            )
+                    onContinue(
+                        info.copy(
+                            operador = operador,
+                            codTractor = codTractor,
+                            codImplemento = codImplemento,
+                            potenciaTractor = potenciaTractor,
+                            potenciaTdf = potenciaTdf,
+                            formula = formula,
+                            presion = presion,
+                            volumen = volumen,
+                            nozzlesIzquierdo = leftNozzles,
+                            nozzlesDerecho = rightNozzles,
+                            tiempoDesplazamientoSegundos = calcTimeSec,
+                            distanciaMetros = calcDistance,
+                            velocidadKmh = calcSpeed
                         )
-                    }
+                    )
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
-                Text("Continuar")
+                Text("Finalizar")
             }
         }
     }
