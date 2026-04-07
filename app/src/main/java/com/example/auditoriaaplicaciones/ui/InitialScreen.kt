@@ -97,6 +97,17 @@ data class AuditoriaInfo(
 ) : Serializable
 
 @Composable
+fun blackTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color.Black,
+    unfocusedTextColor = Color.Black,
+    focusedBorderColor = Color.Black,
+    unfocusedBorderColor = Color.Black,
+    focusedLabelColor = Color.Black,
+    unfocusedLabelColor = Color.Black,
+    cursorColor = Color.Black
+)
+
+@Composable
 fun BackgroundVideo() {
     val context = LocalContext.current
     val exoPlayer = remember {
@@ -233,28 +244,23 @@ fun MainMenu(
     ) {
         Spacer(modifier = Modifier.weight(1f))
         
-        Card(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Auditoria APLICACIONES",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "auditorias generales",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center
-                )
-            }
+            Text(
+                text = "Auditoria APLICACIONES",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+                color = Color.Black
+            )
+            Text(
+                text = "auditorias generales",
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                color = Color.Black
+            )
         }
 
         MenuButton(
@@ -281,18 +287,12 @@ fun MainMenu(
         
         Spacer(modifier = Modifier.weight(1f))
         
-        Surface(
-            color = Color(0xFFF5E1C8),
-            contentColor = Color.Black,
-            shape = RoundedCornerShape(8.dp),
+        Text(
+            text = "CT&A 2026",
+            color = Color.Black,
+            fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
-        ) {
-            Text(
-                text = "CT&A 2026",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
+        )
     }
 }
 
@@ -514,7 +514,7 @@ fun DatosGeneralesScreen(
             onValueChange = { evaluador = it },
             label = { Text("Evaluador") },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
         OutlinedTextField(
@@ -534,7 +534,7 @@ fun DatosGeneralesScreen(
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledBorderColor = MaterialTheme.colorScheme.outline
             ),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
         OutlinedTextField(
@@ -554,7 +554,7 @@ fun DatosGeneralesScreen(
                 disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 disabledBorderColor = MaterialTheme.colorScheme.outline
             ),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
         OutlinedTextField(
@@ -568,7 +568,7 @@ fun DatosGeneralesScreen(
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             isError = lote.isNotEmpty() && (lote.toIntOrNull() ?: 0) !in 1..87,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
         OutlinedTextField(
@@ -576,7 +576,7 @@ fun DatosGeneralesScreen(
             onValueChange = { finca = it },
             label = { Text("Finca") },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -754,23 +754,23 @@ fun FormularioAuditoriaScreen(
                 Text(text = "Detalles de Auditoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
 
         // --- Form Fields ---
-        OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+        OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = codTractor, onValueChange = { codTractor = it }, label = { Text("Cód. Tractor") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
-            OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = codTractor, onValueChange = { codTractor = it }, label = { Text("Cód. Tractor") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+            OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
-            OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+            OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
         }
 
-        OutlinedTextField(value = formula, onValueChange = { formula = it }, label = { Text("Fórmula a aplicar") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+        OutlinedTextField(value = formula, onValueChange = { formula = it }, label = { Text("Fórmula a aplicar") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
-            OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+            OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
         }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
@@ -783,12 +783,12 @@ fun FormularioAuditoriaScreen(
                 OutlinedTextField(
                     value = nozzle.volumen,
                     onValueChange = { newVal -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newVal) } },
-                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                 )
                 OutlinedTextField(
                     value = nozzle.presion,
                     onValueChange = { newVal -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newVal) } },
-                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                 )
             }
                 }
@@ -800,12 +800,12 @@ fun FormularioAuditoriaScreen(
                 OutlinedTextField(
                     value = nozzle.volumen,
                     onValueChange = { newVal -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newVal) } },
-                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                    label = { Text("Volumen 30 s") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                 )
                 OutlinedTextField(
                     value = nozzle.presion,
                     onValueChange = { newVal -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newVal) } },
-                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
+                    label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                 )
             }
                 }
@@ -818,7 +818,7 @@ fun FormularioAuditoriaScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f), contentColor = Color.Black),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors(),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -930,7 +930,7 @@ fun FormularioAuditoriaScreen(
                 label = { Text("¿Cuántas boquillas?") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
             )
         }
 
@@ -987,7 +987,7 @@ fun FormularioAuditoriaScreen(
                         label = { Text("Gotas (1cm²)") },
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                     )
                     OutlinedTextField(
                         value = papelGotasCuarto,
@@ -995,7 +995,7 @@ fun FormularioAuditoriaScreen(
                         label = { Text("Gotas (1/4 cm²)") },
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                     )
                 }
             }
