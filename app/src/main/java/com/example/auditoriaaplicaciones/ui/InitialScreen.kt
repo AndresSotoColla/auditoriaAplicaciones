@@ -214,9 +214,10 @@ fun InitialScreen(
                             onOptionSelected = { option ->
                                 showSelectionDialog = false
                                 auditoriaInfo = AuditoriaInfo(tipoAuditoria = option)
-                                if (option == "Spray Boom" || option == "Mezclas") {
-                                    // For now both route into the same question line to reuse the UI
+                                if (option == "Spray Boom") {
                                     currentScreen = "SprayBoom"
+                                } else if (option == "Mezclas") {
+                                    currentScreen = "DatosGenerales"
                                 }
                             }
                         )
@@ -236,7 +237,10 @@ fun InitialScreen(
                 "DatosGenerales" -> {
                     DatosGeneralesScreen(
                         infoInicial = auditoriaInfo,
-                        onBack = { currentScreen = "SprayBoom" },
+                        onBack = { 
+                            if (auditoriaInfo.tipoAuditoria == "Mezclas") currentScreen = "Menu"
+                            else currentScreen = "SprayBoom"
+                        },
                         onContinue = { info ->
                             Toast.makeText(context, "Navigating to Formulario...", Toast.LENGTH_SHORT).show()
                             auditoriaInfo = info
