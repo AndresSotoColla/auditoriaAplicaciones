@@ -34,16 +34,16 @@ import com.example.auditoriaaplicaciones.ui.theme.AuditoriaAplicacionesTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import kotlinx.parcelize.Parcelize
+// Deleted Parcelize import
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.random.Random
 
-// Para soportar guardado de estado ante rotaciones, los usamos como Parcelable
-@Parcelize
-data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Parcelable
+import java.io.Serializable
 
-@Parcelize
+// Para soportar guardado de estado ante rotaciones, los usamos como Serializable
+data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Serializable
+
 data class AuditoriaInfo(
     var evaluador: String = "",
     var fecha: Long = System.currentTimeMillis(),
@@ -77,7 +77,7 @@ data class AuditoriaInfo(
     var papelHidrosensible: Boolean = false,
     var papelGotas1cm: String = "",
     var papelGotasCuarto: String = ""
-) : Parcelable
+) : Serializable
 
 @Composable
 fun InitialScreen(
