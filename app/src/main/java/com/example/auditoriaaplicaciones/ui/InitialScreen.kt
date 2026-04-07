@@ -208,12 +208,7 @@ fun InitialScreen(
         BackgroundVideo()
         
         Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "DEBUG INFO -> Pantalla Actual: $currentScreen",
-            color = androidx.compose.ui.graphics.Color.Red,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(8.dp).background(androidx.compose.ui.graphics.Color.Yellow)
-        )
+
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (currentScreen) {
@@ -619,14 +614,17 @@ fun DatosGeneralesScreen(
         OutlinedTextField(
             value = lote,
             onValueChange = { 
-                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                    lote = it 
+                if (it.isEmpty()) {
+                    lote = it
+                } else if (it.all { char -> char.isDigit() }) {
+                    if ((it.toIntOrNull() ?: 0) <= 87) {
+                        lote = it 
+                    }
                 }
             },
             label = { Text("Lote (01 - 87)") },
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            isError = lote.isNotEmpty() && (lote.toIntOrNull() ?: 0) !in 1..87,
             shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
@@ -1643,147 +1641,139 @@ fun FormularioMezclasScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                                 Text("Insumo", fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
-                                Text("Cantidad", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                Text("Unidad", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Text("Vol.", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Text("Aplicó?", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
                             }
                             androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.5f))
                             
-                            selectedInsumos.forEach { insumo ->
-                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                                    Text(insumo.insumo, modifier = Modifier.weight(2f), fontSize = 12.sp)
-                                    Text(insumo.cantidad, modifier = Modifier.weight(1f), fontSize = 12.sp)
-                                    Text(insumo.unidad, modifier = Modifier.weight(1f), fontSize = 12.sp)
-                                }
-                                androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "Validación de Productos:", fontWeight = FontWeight.Bold, color = Color.Black)
-
-                    productosEvaluados.forEachIndexed { index, pe ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(pe.producto, fontWeight = FontWeight.Bold)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("¿Se aplicó este producto?")
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    RadioButton(selected = pe.cumple, onClick = {
-                                        val m = productosEvaluados.toMutableList()
-                                        m[index] = pe.copy(cumple = true)
-                                        productosEvaluados = m
-                                    })
-                                    Text("Sí")
-                                    RadioButton(selected = !pe.cumple, onClick = {
-                                        val m = productosEvaluados.toMutableList()
-                                        m[index] = pe.copy(cumple = false)
-                                        productosEvaluados = m
-                                    })
-                                    Text("No")
-                                }
-                                if (!pe.cumple) {
-                                    OutlinedTextField(
-                                        value = pe.reemplazo,
-                                        onValueChange = { 
-                                            val m = productosEvaluados.toMutableList()
-                                            m[index] = pe.copy(reemplazo = it)
-                                            productosEvaluados = m
-                                        },
-                                        label = { Text("Producto reemplazo") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = blackTextFieldColors(),
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
+                            productosEvaluados.forEachIndexed { index, pe ->
+                                val insumo = selectedInsumos.getOrNull(index)
+                                if (insumo != null) {
+                                    Column {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text(insumo.insumo, modifier = Modifier.weight(2f), fontSize = 12.sp)
+                                            Text("${insumo.cantidad} ${insumo.unidad}", modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                            Row(modifier = Modifier.weight(1.5f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                                                RadioButton(selected = pe.cumple, onClick = {
+                                                    val m = productosEvaluados.toMutableList()
+                                                    m[index] = pe.copy(cumple = true)
+                                                    productosEvaluados = m
+                                                }, modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Sí", fontSize = 12.sp)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                RadioButton(selected = !pe.cumple, onClick = {
+                                                    val m = productosEvaluados.toMutableList()
+                                                    m[index] = pe.copy(cumple = false)
+                                                    productosEvaluados = m
+                                                }, modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("No", fontSize = 12.sp)
+                                            }
+                                        }
+                                        if (!pe.cumple) {
+                                            OutlinedTextField(
+                                                value = pe.reemplazo,
+                                                onValueChange = { 
+                                                    val m = productosEvaluados.toMutableList()
+                                                    m[index] = pe.copy(reemplazo = it)
+                                                    productosEvaluados = m
+                                                },
+                                                label = { Text("Reemplazo") },
+                                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                                colors = blackTextFieldColors(),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                        }
+                                        androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
+                                    }
                                 }
                             }
                         }
                     }
+                } // End if Empty Formula
 
-                    // Incompatibilidad
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("¿Se genera incompatibilidad?", fontWeight = FontWeight.Bold, color = Color.Black)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected = incompatibilidad, onClick = { incompatibilidad = true })
-                                Text("Sí", color = Color.Black)
-                                Spacer(modifier = Modifier.width(16.dp))
-                                RadioButton(selected = !incompatibilidad, onClick = { incompatibilidad = false })
-                                Text("No", color = Color.Black)
-                            }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Incompatibilidad
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("¿Se genera incompatibilidad?", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = incompatibilidad, onClick = { incompatibilidad = true })
+                            Text("Sí", color = Color.Black)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            RadioButton(selected = !incompatibilidad, onClick = { incompatibilidad = false })
+                            Text("No", color = Color.Black)
                         }
                     }
+                }
 
-                    // Orden de Mezclado
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("¿Se respeta el orden de mezclado?", fontWeight = FontWeight.Bold, color = Color.Black)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected = ordenMezclado, onClick = { ordenMezclado = true })
-                                Text("Sí", color = Color.Black)
-                                Spacer(modifier = Modifier.width(16.dp))
-                                RadioButton(selected = !ordenMezclado, onClick = { ordenMezclado = false })
-                                Text("No", color = Color.Black)
-                            }
-                            if (!ordenMezclado) {
-                                OutlinedTextField(
-                                    value = obsOrdenMezclado,
-                                    onValueChange = { obsOrdenMezclado = it },
-                                    label = { Text("Observación orden de mezclado") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = blackTextFieldColors()
-                                )
-                            }
+                // Orden de Mezclado
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("¿Se respeta el orden de mezclado?", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = ordenMezclado, onClick = { ordenMezclado = true })
+                            Text("Sí", color = Color.Black)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            RadioButton(selected = !ordenMezclado, onClick = { ordenMezclado = false })
+                            Text("No", color = Color.Black)
+                        }
+                        if (!ordenMezclado) {
+                            OutlinedTextField(
+                                value = obsOrdenMezclado,
+                                onValueChange = { obsOrdenMezclado = it },
+                                label = { Text("Observación orden de mezclado") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = blackTextFieldColors()
+                            )
                         }
                     }
+                }
 
-                    // Uso de EPP
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("¿Operario usa EPP?", fontWeight = FontWeight.Bold, color = Color.Black)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected = usaEpp, onClick = { usaEpp = true })
-                                Text("Sí", color = Color.Black)
-                                Spacer(modifier = Modifier.width(16.dp))
-                                RadioButton(selected = !usaEpp, onClick = { usaEpp = false })
-                                Text("No", color = Color.Black)
-                            }
-                            if (!usaEpp) {
-                                OutlinedTextField(
-                                    value = obsEpp,
-                                    onValueChange = { obsEpp = it },
-                                    label = { Text("Observación uso EPP") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = blackTextFieldColors()
-                                )
-                            }
+                // Uso de EPP
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("¿Operario usa EPP?", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = usaEpp, onClick = { usaEpp = true })
+                            Text("Sí", color = Color.Black)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            RadioButton(selected = !usaEpp, onClick = { usaEpp = false })
+                            Text("No", color = Color.Black)
+                        }
+                        if (!usaEpp) {
+                            OutlinedTextField(
+                                value = obsEpp,
+                                onValueChange = { obsEpp = it },
+                                label = { Text("Observación uso EPP") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = blackTextFieldColors()
+                            )
                         }
                     }
+                }
 
-                    // Tanque limpio
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("¿Tanque limpio?", fontWeight = FontWeight.Bold, color = Color.Black)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected = tanqueLimpio, onClick = { tanqueLimpio = true })
-                                Text("Sí", color = Color.Black)
-                                Spacer(modifier = Modifier.width(16.dp))
-                                RadioButton(selected = !tanqueLimpio, onClick = { tanqueLimpio = false })
-                                Text("No", color = Color.Black)
-                            }
-                            if (!tanqueLimpio) {
-                                OutlinedTextField(
-                                    value = obsTanqueLimpio,
-                                    onValueChange = { obsTanqueLimpio = it },
-                                    label = { Text("Observación tanque limpio") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = blackTextFieldColors()
-                                )
-                            }
+                // Tanque limpio
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f))) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("¿Tanque limpio?", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = tanqueLimpio, onClick = { tanqueLimpio = true })
+                            Text("Sí", color = Color.Black)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            RadioButton(selected = !tanqueLimpio, onClick = { tanqueLimpio = false })
+                            Text("No", color = Color.Black)
+                        }
+                        if (!tanqueLimpio) {
+                            OutlinedTextField(
+                                value = obsTanqueLimpio,
+                                onValueChange = { obsTanqueLimpio = it },
+                                label = { Text("Observación tanque limpio") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = blackTextFieldColors()
+                            )
                         }
                     }
                 }
