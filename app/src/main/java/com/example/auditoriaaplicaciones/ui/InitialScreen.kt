@@ -1460,6 +1460,23 @@ object ExportManager {
                 Uri.fromFile(file)
             }
 
+            if (uri != null) {
+                resolver.openOutputStream(uri)?.use { outputStream ->
+                    workbook.write(outputStream)
+                }
+                workbook.close()
+                Toast.makeText(context, "Excel guardado en Descargas: $fileName", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "Error: No se pudo crear el archivo en Descargas.", Toast.LENGTH_LONG).show()
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Error exportando Excel: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FormularioMezclasScreen(
@@ -1612,22 +1629,6 @@ fun FormularioMezclasScreen(
                     }
                 }
             }
-        }
-    }
-}
-            if (uri != null) {
-                resolver.openOutputStream(uri)?.use { outputStream ->
-                    workbook.write(outputStream)
-                }
-                workbook.close()
-                Toast.makeText(context, "Excel guardado en Descargas: $fileName", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(context, "Error: No se pudo crear el archivo en Descargas.", Toast.LENGTH_LONG).show()
-            }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(context, "Error exportando Excel: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }
