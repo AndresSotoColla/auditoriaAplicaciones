@@ -59,6 +59,36 @@ import java.io.Serializable
 // Para soportar guardado de estado ante rotaciones, los usamos como Serializable
 data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Serializable
 
+data class InsumoData(
+    val codigo: String,
+    val descripcion: String,
+    val insumo: String,
+    val cantidad: String
+)
+
+fun parseCsv(context: android.content.Context): List<InsumoData> {
+    val list = mutableListOf<InsumoData>()
+    try {
+        val inputStream = context.resources.openRawResource(com.example.auditoriaaplicaciones.R.raw.datos)
+        val reader = inputStream.bufferedReader()
+        reader.readLine() // drop header
+        reader.forEachLine { line ->
+            val tokens = line.split(";")
+            if (tokens.size >= 5) {
+                list.add(InsumoData(
+                    codigo = tokens[0],
+                    descripcion = tokens[1],
+                    insumo = tokens[3],
+                    cantidad = tokens[4]
+                ))
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return list
+}
+
 data class AuditoriaInfo(
     var id: String = UUID.randomUUID().toString(),
     var tipoAuditoria: String = "",
@@ -632,6 +662,7 @@ fun DatosGeneralesScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FormularioAuditoriaScreen(
     info: AuditoriaInfo,
@@ -646,6 +677,15 @@ fun FormularioAuditoriaScreen(
     var formula by rememberSaveable { mutableStateOf(info.formula) }
     var presion by rememberSaveable { mutableStateOf(info.presion) }
     var volumen by rememberSaveable { mutableStateOf(info.volumen) }
+    
+    val context = LocalContext.current
+    val insumosList = remember { parseCsv(context) }
+    val codigosUnicos = remember(insumosList) { insumosList.map { it.codigo }.distinct() }
+    var expandedFormula by rememberSaveable { mutableStateOf(false) }
+    // Initialize description if formula is passed from before
+    var selectedDescripcion by rememberSaveable { mutableStateOf(
+        insumosList.firstOrNull { it.codigo == info.formula }?.descripcion ?: ""
+    ) }
 
     // --- Lógica Boquillas Aleatorias ---
     var leftNozzles by rememberSaveable { mutableStateOf(info.nozzlesIzquierdo) }
@@ -750,7 +790,53 @@ fun FormularioAuditoriaScreen(
                 OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                OutlinedTextField(value = formula, onValueChange = { formula = it }, label = { Text("Fórmula a aplicar") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                
+                ExposedDropdownMenuBox(
+                    expanded = expandedFormula,
+                    onExpandedChange = { expandedFormula = !expandedFormula },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = formula,
+                        onValueChange = { 
+                            formula = it
+                            expandedFormula = true
+                        },
+                        label = { Text("Fórmula a aplicar") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                    
+                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
+                    if (filteredCodigos.isNotEmpty() && expandedFormula) {
+                        ExposedDropdownMenu(
+                            expanded = expandedFormula,
+                            onDismissRequest = { expandedFormula = false }
+                        ) {
+                            filteredCodigos.forEach { cod ->
+                                DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        formula = cod
+                                        expandedFormula = false
+                                        val match = insumosList.firstOrNull { it.codigo == cod }
+                                        selectedDescripcion = match?.descripcion ?: ""
+                                        
+                                        val aguaMatch = insumosList.firstOrNull { it.codigo == cod && it.insumo.equals("AGUA", ignoreCase = true) }
+                                        if (aguaMatch != null) {
+                                            volumen = aguaMatch.cantidad
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                if (selectedDescripcion.isNotEmpty()) {
+                    Text(text = "Descripción: $selectedDescripcion", color = Color.DarkGray, fontSize = 14.sp)
+                }
+
                 OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
 
