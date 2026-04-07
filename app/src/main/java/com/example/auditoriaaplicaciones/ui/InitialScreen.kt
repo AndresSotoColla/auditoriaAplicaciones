@@ -353,58 +353,67 @@ fun SprayBoomChecklist(
     // Saveable Custom Saver or simpler approach: ArrayList
     var checkedStatesValues by rememberSaveable { mutableStateOf(BooleanArray(items.size) { false }) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xE6F5E1C8)) // Fondo beige translúcido (90%) para lectura
-            .padding(24.dp)
-    ) {
-        Text(
-            text = "¿Cuenta con los siguientes materiales?",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Text(
+                    text = "¿Cuenta con los siguientes materiales?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
 
-        LazyColumn(modifier = Modifier.weight(1.0f)) {
-            items(items.size) { index ->
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    items.forEachIndexed { index, item ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Checkbox(
+                                checked = checkedStatesValues[index],
+                                onCheckedChange = { isChecked ->
+                                    val nArr = checkedStatesValues.copyOf()
+                                    nArr[index] = isChecked
+                                    checkedStatesValues = nArr
+                                },
+                                colors = CheckboxDefaults.colors(checkmarkColor = Color.White, checkedColor = Color.Black, uncheckedColor = Color.Black)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = item, fontSize = 18.sp, color = Color.Black)
+                        }
+                    }
+                }
+
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                        .padding(top = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Checkbox(
-                        checked = checkedStatesValues[index],
-                        onCheckedChange = { isChecked ->
-                            val nArr = checkedStatesValues.copyOf()
-                            nArr[index] = isChecked
-                            checkedStatesValues = nArr
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = items[index], fontSize = 18.sp)
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                    ) {
+                        Text("Volver")
+                    }
+                    Button(
+                        onClick = onContinue,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                    ) {
+                        Text("Continuar")
+                    }
                 }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            OutlinedButton(
-                onClick = onBack,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Volver")
-            }
-            Button(
-                onClick = onContinue,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Continuar")
             }
         }
     }
@@ -479,20 +488,26 @@ fun DatosGeneralesScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xE6F5E1C8)) // Fondo beige translúcido (90%)
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Datos Generales",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Datos Generales",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
         OutlinedTextField(
             value = evaluador,
@@ -581,40 +596,44 @@ fun DatosGeneralesScreen(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            OutlinedButton(
-                onClick = onBack,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Volver")
-            }
-            Button(
-                onClick = {
-                    val loteNum = lote.toIntOrNull() ?: 0
-                    
-                    if (evaluador.isBlank() || finca.isBlank() || lote.isBlank()) {
-                        debugErrorMsg = "ERROR: Faltan campos básicos.\nEvaluador='${evaluador}'\nFinca='${finca}'\nLote='${lote}'"
-                    } else if (loteNum !in 1..87) {
-                        debugErrorMsg = "ERROR: Lote '${lote}' (numeral=$loteNum) no está entre 1 y 87."
-                    } else {
-                        debugErrorMsg = "Navegando a FormularioAuditoria..."
-                        
-                        val updatedInfo = infoInicial.copy(
-                            evaluador = evaluador,
-                            fecha = fecha,
-                            hora = String.format("%02d:%02d", hour, minute),
-                            finca = finca,
-                            lote = lote
-                        )
-                        onContinue(updatedInfo)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                    ) {
+                        Text("Volver")
                     }
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Continuar")
+                    Button(
+                        onClick = {
+                            val loteNum = lote.toIntOrNull() ?: 0
+                            
+                            if (evaluador.isBlank() || finca.isBlank() || lote.isBlank()) {
+                                debugErrorMsg = "ERROR: Faltan campos básicos.\nEvaluador='${evaluador}'\nFinca='${finca}'\nLote='${lote}'"
+                            } else if (loteNum !in 1..87) {
+                                debugErrorMsg = "ERROR: Lote '${lote}' (numeral=$loteNum) no está entre 1 y 87."
+                            } else {
+                                debugErrorMsg = "Navegando a FormularioAuditoria..."
+                                
+                                val updatedInfo = infoInicial.copy(
+                                    evaluador = evaluador,
+                                    fecha = fecha,
+                                    hora = String.format("%02d:%02d", hour, minute),
+                                    finca = finca,
+                                    lote = lote
+                                )
+                                onContinue(updatedInfo)
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                    ) {
+                        Text("Continuar")
+                    }
+                }
             }
         }
     }
@@ -697,36 +716,42 @@ fun FormularioAuditoriaScreen(
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xE6F5E1C8)) // Fondo beige translúcido (90%)
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // --- Header Section ---
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Resumen de Auditoría", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "Eval: ${info.evaluador}", fontSize = 14.sp)
-                    Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // --- Header Section ---
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = "Resumen de Auditoría", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Eval: ${info.evaluador}", fontSize = 14.sp)
+                            Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Fecha: ${dateFormatter.format(Date(info.fecha))}", fontSize = 14.sp)
+                            Text(text = "Hora: ${info.hora}", fontSize = 14.sp)
+                        }
+                        Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
+                    }
                 }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "Fecha: ${dateFormatter.format(Date(info.fecha))}", fontSize = 14.sp)
-                    Text(text = "Hora: ${info.hora}", fontSize = 14.sp)
-                }
-                Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
-            }
-        }
 
-        Text(text = "Detalles de Auditoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(text = "Detalles de Auditoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
 
         // --- Form Fields ---
         OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
@@ -748,10 +773,10 @@ fun FormularioAuditoriaScreen(
             OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
-        // --- Boquillas Aleatorias ---
-        Text(text = "Brazo Izquierdo (Aleatorio 1-30)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                // --- Boquillas Aleatorias ---
+                Text(text = "Brazo Izquierdo (Aleatorio 1-30)", fontWeight = FontWeight.Bold, color = Color.Black)
         leftNozzles.forEachIndexed { index, nozzle ->
             Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -766,9 +791,9 @@ fun FormularioAuditoriaScreen(
                     label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
                 )
             }
-        }
+                }
 
-        Text(text = "Brazo Derecho (Aleatorio 31-60)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 16.dp))
+                Text(text = "Brazo Derecho (Aleatorio 31-60)", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 16.dp))
         rightNozzles.forEachIndexed { index, nozzle ->
             Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -783,19 +808,21 @@ fun FormularioAuditoriaScreen(
                     label = { Text("Presión (PSI)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp)
                 )
             }
-        }
+                }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
-        // --- Medición de Desplazamiento ---
-        Text(text = "Medición de Desplazamiento (GPS)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                // --- Medición de Desplazamiento ---
+                Text(text = "Medición de Desplazamiento (GPS)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color.Black)
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = gpsStatus, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(bottom = 16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f), contentColor = Color.Black),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = gpsStatus, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 16.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                     FilledTonalButton(
@@ -872,17 +899,17 @@ fun FormularioAuditoriaScreen(
             }
         }
 
-        // Resultados
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "Tiempo: ${calcTimeSec}s")
-            Text(text = "Distancia: ${String.format(Locale.US, "%.2f", calcDistance)}m")
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "Velocidad: ${String.format(Locale.US, "%.2f", calcSpeed)} km/h")
-            Text(text = "Margen Error: ±${String.format(Locale.US, "%.1f", calcError)}m", color = androidx.compose.ui.graphics.Color.Gray)
-        }
+                // Resultados
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "Tiempo: ${calcTimeSec}s", color = Color.Black)
+                    Text(text = "Distancia: ${String.format(Locale.US, "%.2f", calcDistance)}m", color = Color.Black)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(text = "Velocidad: ${String.format(Locale.US, "%.2f", calcSpeed)} km/h", color = Color.Black)
+                    Text(text = "Margen Error: ±${String.format(Locale.US, "%.1f", calcError)}m", color = Color.DarkGray)
+                }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
         // --- Cuestionario Final ---
         Text(text = "¿Boquillas tapadas?", fontWeight = FontWeight.Bold)
@@ -977,41 +1004,44 @@ fun FormularioAuditoriaScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) {
-                Text("Volver")
-            }
-            Button(
-                onClick = {
-                    val updatedInfo = info.copy(
-                        operador = operador,
-                        codTractor = codTractor,
-                        codImplemento = codImplemento,
-                        potenciaTractor = potenciaTractor,
-                        potenciaTdf = potenciaTdf,
-                        formula = formula,
-                        presion = presion,
-                        volumen = volumen,
-                        nozzlesIzquierdo = leftNozzles,
-                        nozzlesDerecho = rightNozzles,
-                        tiempoDesplazamientoSegundos = calcTimeSec,
-                        distanciaMetros = calcDistance,
-                        velocidadKmh = calcSpeed,
-                        
-                        boquillasTapadas = boquillasTapadas,
-                        boquillasTapadasNum = boquillasTapadasNum,
-                        presenciaPersonal = presenciaPersonal,
-                        alturaUniforme = alturaUniforme,
-                        estadoVia = estadoVia,
-                        papelHidrosensible = papelHidro,
-                        papelGotas1cm = papelGotas1cm,
-                        papelGotasCuarto = papelGotasCuarto
-                    )
-                    onContinue(updatedInfo)
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Guardar")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)) {
+                        Text("Volver")
+                    }
+                    Button(
+                        onClick = {
+                            val updatedInfo = info.copy(
+                                operador = operador,
+                                codTractor = codTractor,
+                                codImplemento = codImplemento,
+                                potenciaTractor = potenciaTractor,
+                                potenciaTdf = potenciaTdf,
+                                formula = formula,
+                                presion = presion,
+                                volumen = volumen,
+                                nozzlesIzquierdo = leftNozzles,
+                                nozzlesDerecho = rightNozzles,
+                                tiempoDesplazamientoSegundos = calcTimeSec,
+                                distanciaMetros = calcDistance,
+                                velocidadKmh = calcSpeed,
+                                
+                                boquillasTapadas = boquillasTapadas,
+                                boquillasTapadasNum = boquillasTapadasNum,
+                                presenciaPersonal = presenciaPersonal,
+                                alturaUniforme = alturaUniforme,
+                                estadoVia = estadoVia,
+                                papelHidrosensible = papelHidro,
+                                papelGotas1cm = papelGotas1cm,
+                                papelGotasCuarto = papelGotasCuarto
+                            )
+                            onContinue(updatedInfo)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                    ) {
+                        Text("Guardar")
+                    }
+                }
             }
         }
     }
@@ -1139,58 +1169,66 @@ fun HistorialScreen(onBack: () -> Unit) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xE6F5E1C8)).padding(16.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-            }
-            Text("Historial de Muestreos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.Black)
+                    }
+                    Text("Historial de Muestreos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
+                }
 
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            FilterChip(
-                selected = filterMode == "TODOS",
-                onClick = { filterMode = "TODOS" },
-                label = { Text("Todos") }
-            )
-            FilterChip(
-                selected = filterMode == "Spray Boom",
-                onClick = { filterMode = "Spray Boom" },
-                label = { Text("Spray Boom") }
-            )
-            FilterChip(
-                selected = filterMode == "Mezclas",
-                onClick = { filterMode = "Mezclas" },
-                label = { Text("Mezclas") }
-            )
-        }
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    FilterChip(
+                        selected = filterMode == "TODOS",
+                        onClick = { filterMode = "TODOS" },
+                        label = { Text("Todos", color = Color.Black) }
+                    )
+                    FilterChip(
+                        selected = filterMode == "Spray Boom",
+                        onClick = { filterMode = "Spray Boom" },
+                        label = { Text("Spray Boom", color = Color.Black) }
+                    )
+                    FilterChip(
+                        selected = filterMode == "Mezclas",
+                        onClick = { filterMode = "Mezclas" },
+                        label = { Text("Mezclas", color = Color.Black) }
+                    )
+                }
 
-        if (displayedAudits.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-                Text("No hay muestreos guardados.", color = androidx.compose.ui.graphics.Color.Gray)
-            }
-        } else {
-            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(displayedAudits.size) { index ->
-                    val audit = displayedAudits[index]
-                    val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(audit.fecha))
-                    
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = "${audit.tipoAuditoria} - Finca: ${audit.finca}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Text(text = "Fecha: $dateStr - Lote: ${audit.lote}", fontSize = 14.sp)
-                                Text(text = "Evaluador: ${audit.evaluador}", fontSize = 14.sp)
-                            }
-                            IconButton(onClick = { auditToDelete = audit.id }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = androidx.compose.ui.graphics.Color.Red)
+                if (displayedAudits.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("No hay muestreos guardados.", color = Color.DarkGray)
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(displayedAudits.size) { index ->
+                            val audit = displayedAudits[index]
+                            val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(audit.fecha))
+                            
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f), contentColor = Color.Black),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            ) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = "${audit.tipoAuditoria} - Finca: ${audit.finca}", fontWeight = FontWeight.Bold, color = Color.Black)
+                                        Text(text = "Fecha: $dateStr - Lote: ${audit.lote}", fontSize = 14.sp, color = Color.DarkGray)
+                                        Text(text = "Evaluador: ${audit.evaluador}", fontSize = 14.sp, color = Color.DarkGray)
+                                    }
+                                    IconButton(onClick = { auditToDelete = audit.id }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = androidx.compose.ui.graphics.Color.Red)
+                                    }
+                                }
                             }
                         }
                     }
