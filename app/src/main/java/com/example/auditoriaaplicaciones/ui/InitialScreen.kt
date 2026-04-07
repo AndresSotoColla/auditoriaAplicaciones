@@ -1,5 +1,6 @@
 package com.example.auditoriaaplicaciones.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,7 @@ fun InitialScreen(
     var showSelectionDialog by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf("Menu") }
     var auditoriaInfo by remember { mutableStateOf(AuditoriaInfo()) }
+    val context = LocalContext.current
 
     Box(modifier = modifier.fillMaxSize()) {
         when (currentScreen) {
@@ -83,6 +86,7 @@ fun InitialScreen(
                 DatosGeneralesScreen(
                     onBack = { currentScreen = "SprayBoom" },
                     onContinue = { info ->
+                        Toast.makeText(context, "Navigating to Formulario...", Toast.LENGTH_SHORT).show()
                         auditoriaInfo = info
                         currentScreen = "FormularioAuditoria"
                     }
@@ -272,8 +276,8 @@ fun DatosGeneralesScreen(
     var lote by remember { mutableStateOf("") }
     var finca by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
-    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = fecha)
@@ -388,13 +392,14 @@ fun DatosGeneralesScreen(
         OutlinedTextField(
             value = lote,
             onValueChange = { 
-                if (it.isEmpty() || (it.all { char -> char.isDigit() } && it.toInt() in 1..87)) {
+                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
                     lote = it 
                 }
             },
             label = { Text("Lote (01 - 87)") },
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            isError = lote.isNotEmpty() && (lote.toIntOrNull() ?: 0) !in 1..87,
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -420,18 +425,24 @@ fun DatosGeneralesScreen(
             }
             Button(
                 onClick = {
-                    onContinue(
-                        AuditoriaInfo(
-                            evaluador = evaluador,
-                            fecha = fecha,
-                            hora = String.format("%02d:%02d", hour, minute),
-                            finca = finca,
-                            lote = lote
+                    val loteNum = lote.toIntOrNull() ?: 0
+                    if (evaluador.isBlank() || finca.isBlank() || lote.isBlank()) {
+                        Toast.makeText(context, "Por favor complete todos los campos", Toast.LENGTH_SHORT).show()
+                    } else if (loteNum !in 1..87) {
+                        Toast.makeText(context, "El lote debe estar entre 1 y 87", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onContinue(
+                            AuditoriaInfo(
+                                evaluador = evaluador,
+                                fecha = fecha,
+                                hora = String.format("%02d:%02d", hour, minute),
+                                finca = finca,
+                                lote = lote
+                            )
                         )
-                    )
+                    }
                 },
-                modifier = Modifier.weight(1f),
-                enabled = evaluador.isNotBlank() && lote.isNotBlank() && finca.isNotBlank()
+                modifier = Modifier.weight(1f)
             ) {
                 Text("Continuar")
             }
@@ -454,6 +465,7 @@ fun FormularioAuditoriaScreen(
     var presion by remember { mutableStateOf("") }
     var volumen by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     Column(
@@ -577,21 +589,24 @@ fun FormularioAuditoriaScreen(
             }
             Button(
                 onClick = {
-                    onContinue(
-                        info.copy(
-                            operador = operador,
-                            codTractor = codTractor,
-                            codImplemento = codImplemento,
-                            potenciaTractor = potenciaTractor,
-                            potenciaTdf = potenciaTdf,
-                            formula = formula,
-                            presion = presion,
-                            volumen = volumen
+                    if (operador.isBlank() || formula.isBlank() || volumen.isBlank()) {
+                        Toast.makeText(context, "Complete los campos obligatorios", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onContinue(
+                            info.copy(
+                                operador = operador,
+                                codTractor = codTractor,
+                                codImplemento = codImplemento,
+                                potenciaTractor = potenciaTractor,
+                                potenciaTdf = potenciaTdf,
+                                formula = formula,
+                                presion = presion,
+                                volumen = volumen
+                            )
                         )
-                    )
+                    }
                 },
-                modifier = Modifier.weight(1f),
-                enabled = operador.isNotBlank() && formula.isNotBlank() && volumen.isNotBlank()
+                modifier = Modifier.weight(1f)
             ) {
                 Text("Continuar")
             }
