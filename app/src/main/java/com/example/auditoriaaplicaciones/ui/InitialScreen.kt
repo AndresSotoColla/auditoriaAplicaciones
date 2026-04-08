@@ -764,6 +764,7 @@ fun FormularioAuditoriaScreen(
     var potenciaTractor by rememberSaveable { mutableStateOf(info.potenciaTractor) }
     var potenciaTdf by rememberSaveable { mutableStateOf(info.potenciaTdf) }
     var formula by rememberSaveable { mutableStateOf(info.formula) }
+    var manualFormulaName by rememberSaveable { mutableStateOf("") }
     var presion by rememberSaveable { mutableStateOf(info.presion) }
     var volumen by rememberSaveable { mutableStateOf(info.volumen) }
     
@@ -962,17 +963,16 @@ fun FormularioAuditoriaScreen(
                 ) {
                     OutlinedTextField(
                         value = formula,
-                        onValueChange = { 
-                            formula = it
-                            expandedFormula = true
-                        },
+                        onValueChange = { },
                         label = { Text("Fórmula a aplicar") },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
+                        colors = blackTextFieldColors(),
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
                     )
                     
-                val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
+                val filteredCodigos = codigosUnicos.toMutableList()
                 if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
                 
                 if (filteredCodigos.isNotEmpty() && expandedFormula) {
@@ -995,6 +995,7 @@ fun FormularioAuditoriaScreen(
                                         if (aguaMatch != null) {
                                             volumen = aguaMatch.cantidad
                                         }
+                                        manualFormulaName = ""
                                     }
                                 }
                             )
@@ -1003,6 +1004,14 @@ fun FormularioAuditoriaScreen(
                 }
             }
             if (formula == "OTRO") {
+                OutlinedTextField(
+                    value = manualFormulaName,
+                    onValueChange = { manualFormulaName = it },
+                    label = { Text("Nombre de la Fórmula (Manual)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
                 OutlinedTextField(
                     value = selectedDescripcion,
                     onValueChange = { selectedDescripcion = it },
@@ -1326,7 +1335,7 @@ fun FormularioAuditoriaScreen(
                                 codImplemento = codImplemento,
                                 potenciaTractor = potenciaTractor,
                                 potenciaTdf = potenciaTdf,
-                                formula = formula,
+                                formula = if (formula == "OTRO") manualFormulaName else formula,
                                 presion = presion,
                                 volumen = volumen,
                                 nozzlesIzquierdo = leftNozzles,
@@ -1805,7 +1814,7 @@ fun FormularioMezclasScreen(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
                     )
                     
-                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
+                    val filteredCodigos = codigosUnicos.toMutableList()
                     if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
 
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
