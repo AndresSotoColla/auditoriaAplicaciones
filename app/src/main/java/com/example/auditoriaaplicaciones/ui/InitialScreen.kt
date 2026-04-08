@@ -125,6 +125,8 @@ data class AuditoriaInfo(
     var phAgua: String = "",
     var durezaAgua: String = "",
     var ceAgua: String = "",
+    var phFinal: String = "",
+    var ceFinal: String = "",
     
     // Boquillas
     var nozzlesIzquierdo: List<NozzleData> = emptyList(),
@@ -1449,6 +1451,7 @@ object ExportManager {
             val mezclasHeaders = arrayOf(
                 "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", 
                 "pH Inicial", "Dureza Agua", "CE Agua mS/cm",
+                "pH Final", "CE Final mS/cm",
                 "Mezclador", "Formula",
                 "Productos Evaluados (JSON)", "Incompatibilidad", "Respeta Orden", "Obs Orden",
                 "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque"
@@ -1479,18 +1482,20 @@ object ExportManager {
                     row.createCell(6).setCellValue(audit.phAgua)
                     row.createCell(7).setCellValue(audit.durezaAgua)
                     row.createCell(8).setCellValue(audit.ceAgua)
-                    row.createCell(9).setCellValue(audit.mezclador)
-                    row.createCell(10).setCellValue(audit.formulaMezclar)
+                    row.createCell(9).setCellValue(audit.phFinal)
+                    row.createCell(10).setCellValue(audit.ceFinal)
+                    row.createCell(11).setCellValue(audit.mezclador)
+                    row.createCell(12).setCellValue(audit.formulaMezclar)
                     
                     val jsonProductos = com.google.gson.Gson().toJson(audit.productosEvaluados)
-                    row.createCell(11).setCellValue(jsonProductos)
-                    row.createCell(12).setCellValue(if (audit.incompatibilidad) "SI" else "NO")
-                    row.createCell(13).setCellValue(if (audit.ordenMezclado) "SI" else "NO")
-                    row.createCell(14).setCellValue(audit.obsOrdenMezclado)
-                    row.createCell(15).setCellValue(if (audit.usaEpp) "SI" else "NO")
-                    row.createCell(16).setCellValue(audit.obsEpp)
-                    row.createCell(17).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
-                    row.createCell(18).setCellValue(audit.obsTanqueLimpio)
+                    row.createCell(13).setCellValue(jsonProductos)
+                    row.createCell(14).setCellValue(if (audit.incompatibilidad) "SI" else "NO")
+                    row.createCell(15).setCellValue(if (audit.ordenMezclado) "SI" else "NO")
+                    row.createCell(16).setCellValue(audit.obsOrdenMezclado)
+                    row.createCell(17).setCellValue(if (audit.usaEpp) "SI" else "NO")
+                    row.createCell(18).setCellValue(audit.obsEpp)
+                    row.createCell(19).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
+                    row.createCell(20).setCellValue(audit.obsTanqueLimpio)
                 } else {
                     val row = sbSheet.createRow(sbRowIdx++)
                 
@@ -1585,6 +1590,9 @@ fun FormularioMezclasScreen(
     var obsEpp by rememberSaveable { mutableStateOf(info.obsEpp) }
     var tanqueLimpio by rememberSaveable { mutableStateOf(info.tanqueLimpio) }
     var obsTanqueLimpio by rememberSaveable { mutableStateOf(info.obsTanqueLimpio) }
+    
+    var phFinal by rememberSaveable { mutableStateOf(info.phFinal) }
+    var ceFinal by rememberSaveable { mutableStateOf(info.ceFinal) }
 
     LaunchedEffect(selectedInsumos) {
         if (productosEvaluados.isEmpty() || selectedInsumos.map { it.insumo } != productosEvaluados.map { it.producto }) {
@@ -1670,7 +1678,7 @@ fun FormularioMezclasScreen(
                         DropdownMenu(
                             expanded = expandedFormula,
                             onDismissRequest = { expandedFormula = false },
-                            modifier = Modifier.exposedDropdownSize()
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFF5E1C8))
                         ) {
                             filteredCodigos.forEach { cod ->
                                 DropdownMenuItem(
@@ -1683,6 +1691,26 @@ fun FormularioMezclasScreen(
                             }
                         }
                     }
+                }
+
+                // New fields for final parameters
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = phFinal,
+                        onValueChange = { phFinal = it },
+                        label = { Text("pH final") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = ceFinal,
+                        onValueChange = { ceFinal = it },
+                        label = { Text("CE final (mS/cm)") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+                    )
                 }
 
                 // Table of components
@@ -1851,7 +1879,9 @@ fun FormularioMezclasScreen(
                                 usaEpp = usaEpp,
                                 obsEpp = obsEpp,
                                 tanqueLimpio = tanqueLimpio,
-                                obsTanqueLimpio = obsTanqueLimpio
+                                obsTanqueLimpio = obsTanqueLimpio,
+                                phFinal = phFinal,
+                                ceFinal = ceFinal
                             )
                             onContinue(updatedInfo)
                         },
