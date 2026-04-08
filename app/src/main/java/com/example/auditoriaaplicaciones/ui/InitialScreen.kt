@@ -122,6 +122,10 @@ data class AuditoriaInfo(
     var tanqueLimpio: Boolean = true,
     var obsTanqueLimpio: String = "",
     
+    var phAgua: String = "",
+    var durezaAgua: String = "",
+    var ceAgua: String = "",
+    
     // Boquillas
     var nozzlesIzquierdo: List<NozzleData> = emptyList(),
     var nozzlesDerecho: List<NozzleData> = emptyList(),
@@ -501,6 +505,9 @@ fun DatosGeneralesScreen(
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
     var lote by rememberSaveable { mutableStateOf(infoInicial.lote) }
     var finca by rememberSaveable { mutableStateOf(infoInicial.finca) }
+    var phAgua by rememberSaveable { mutableStateOf(infoInicial.phAgua) }
+    var durezaAgua by rememberSaveable { mutableStateOf(infoInicial.durezaAgua) }
+    var ceAgua by rememberSaveable { mutableStateOf(infoInicial.ceAgua) }
     var debugErrorMsg by rememberSaveable { mutableStateOf("") }
 
     val context = LocalContext.current
@@ -636,6 +643,38 @@ fun DatosGeneralesScreen(
             shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
+        if (infoInicial.tipoAuditoria == "Mezclas") {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.1f))
+            Text("Calidad del Agua", fontWeight = FontWeight.Bold, color = Color.Black)
+            
+            OutlinedTextField(
+                value = phAgua,
+                onValueChange = { phAgua = it },
+                label = { Text("pH inicial del agua") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+
+            OutlinedTextField(
+                value = durezaAgua,
+                onValueChange = { durezaAgua = it },
+                label = { Text("Dureza del agua") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+
+            OutlinedTextField(
+                value = ceAgua,
+                onValueChange = { ceAgua = it },
+                label = { Text("CE agua (mS/cm)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         if (debugErrorMsg.isNotEmpty()) {
@@ -680,7 +719,10 @@ fun DatosGeneralesScreen(
                                     fecha = fecha,
                                     hora = String.format("%02d:%02d", hour, minute),
                                     finca = finca,
-                                    lote = lote
+                                    lote = lote,
+                                    phAgua = phAgua,
+                                    durezaAgua = durezaAgua,
+                                    ceAgua = ceAgua
                                 )
                                 onContinue(updatedInfo)
                             }
@@ -1405,7 +1447,9 @@ object ExportManager {
             )
             
             val mezclasHeaders = arrayOf(
-                "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", "Mezclador", "Formula",
+                "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", 
+                "pH Inicial", "Dureza Agua", "CE Agua mS/cm",
+                "Mezclador", "Formula",
                 "Productos Evaluados (JSON)", "Incompatibilidad", "Respeta Orden", "Obs Orden",
                 "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque"
             )
@@ -1432,18 +1476,21 @@ object ExportManager {
                     row.createCell(3).setCellValue(audit.evaluador)
                     row.createCell(4).setCellValue(audit.finca)
                     row.createCell(5).setCellValue(audit.lote)
-                    row.createCell(6).setCellValue(audit.mezclador)
-                    row.createCell(7).setCellValue(audit.formulaMezclar)
+                    row.createCell(6).setCellValue(audit.phAgua)
+                    row.createCell(7).setCellValue(audit.durezaAgua)
+                    row.createCell(8).setCellValue(audit.ceAgua)
+                    row.createCell(9).setCellValue(audit.mezclador)
+                    row.createCell(10).setCellValue(audit.formulaMezclar)
                     
                     val jsonProductos = com.google.gson.Gson().toJson(audit.productosEvaluados)
-                    row.createCell(8).setCellValue(jsonProductos)
-                    row.createCell(9).setCellValue(if (audit.incompatibilidad) "SI" else "NO")
-                    row.createCell(10).setCellValue(if (audit.ordenMezclado) "SI" else "NO")
-                    row.createCell(11).setCellValue(audit.obsOrdenMezclado)
-                    row.createCell(12).setCellValue(if (audit.usaEpp) "SI" else "NO")
-                    row.createCell(13).setCellValue(audit.obsEpp)
-                    row.createCell(14).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
-                    row.createCell(15).setCellValue(audit.obsTanqueLimpio)
+                    row.createCell(11).setCellValue(jsonProductos)
+                    row.createCell(12).setCellValue(if (audit.incompatibilidad) "SI" else "NO")
+                    row.createCell(13).setCellValue(if (audit.ordenMezclado) "SI" else "NO")
+                    row.createCell(14).setCellValue(audit.obsOrdenMezclado)
+                    row.createCell(15).setCellValue(if (audit.usaEpp) "SI" else "NO")
+                    row.createCell(16).setCellValue(audit.obsEpp)
+                    row.createCell(17).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
+                    row.createCell(18).setCellValue(audit.obsTanqueLimpio)
                 } else {
                     val row = sbSheet.createRow(sbRowIdx++)
                 
@@ -1579,6 +1626,15 @@ fun FormularioMezclasScreen(
                             Text("Hora: ${info.hora}", fontSize = 14.sp)
                         }
                         Text("Lote: ${info.lote}", fontSize = 14.sp)
+                        
+                        if (info.phAgua.isNotEmpty() || info.durezaAgua.isNotEmpty() || info.ceAgua.isNotEmpty()) {
+                            androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.1f))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                if (info.phAgua.isNotEmpty()) Text("pH: ${info.phAgua}", fontSize = 13.sp)
+                                if (info.durezaAgua.isNotEmpty()) Text("Dureza: ${info.durezaAgua}", fontSize = 13.sp)
+                                if (info.ceAgua.isNotEmpty()) Text("CE: ${info.ceAgua} mS/cm", fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
 
