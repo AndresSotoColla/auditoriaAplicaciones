@@ -62,7 +62,14 @@ import java.io.Serializable
 
 // Para soportar guardado de estado ante rotaciones, los usamos como Serializable
 data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Serializable
-data class ProductoEvaluado(val producto: String, var cumple: Boolean = true, var reemplazo: String = "") : Serializable
+data class ProductoEvaluado(
+    val producto: String, 
+    var cumple: Boolean = true, 
+    var reemplazo: String = "",
+    var cantidad: String = "",
+    var unidad: String = "",
+    var orden: String = ""
+) : Serializable
 
 data class InsumoData(
     val codigo: String,
@@ -965,19 +972,22 @@ fun FormularioAuditoriaScreen(
                         colors = blackTextFieldColors()
                     )
                     
-                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
-                    if (filteredCodigos.isNotEmpty() && expandedFormula) {
-                        DropdownMenu(
-                            expanded = expandedFormula,
-                            onDismissRequest = { expandedFormula = false },
-                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
-                        ) {
-                            filteredCodigos.forEach { cod ->
-                                DropdownMenuItem(
-                                    text = { Text(cod, color = Color.Black) },
-                                    onClick = {
-                                        formula = cod
-                                        expandedFormula = false
+                val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
+                if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
+                
+                if (filteredCodigos.isNotEmpty() && expandedFormula) {
+                    DropdownMenu(
+                        expanded = expandedFormula,
+                        onDismissRequest = { expandedFormula = false },
+                        modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                    ) {
+                        filteredCodigos.forEach { cod ->
+                            DropdownMenuItem(
+                                text = { Text(cod, color = Color.Black) },
+                                onClick = {
+                                    formula = cod
+                                    expandedFormula = false
+                                    if (cod != "OTRO") {
                                         val match = insumosList.firstOrNull { it.codigo == cod }
                                         selectedDescripcion = match?.descripcion ?: ""
                                         
@@ -986,14 +996,24 @@ fun FormularioAuditoriaScreen(
                                             volumen = aguaMatch.cantidad
                                         }
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
                 }
-                if (selectedDescripcion.isNotEmpty()) {
-                    Text(text = "Descripción: $selectedDescripcion", color = Color.DarkGray, fontSize = 14.sp)
-                }
+            }
+            if (formula == "OTRO") {
+                OutlinedTextField(
+                    value = selectedDescripcion,
+                    onValueChange = { selectedDescripcion = it },
+                    label = { Text("Descripción de la Fórmula") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+            } else if (selectedDescripcion.isNotEmpty()) {
+                Text(text = "Descripción: $selectedDescripcion", color = Color.DarkGray, fontSize = 14.sp)
+            }
 
                 OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
@@ -1785,7 +1805,9 @@ fun FormularioMezclasScreen(
                         colors = blackTextFieldColors()
                     )
                     
-                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10)
+                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
+                    if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
+
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
                         DropdownMenu(
                             expanded = expandedFormula,
@@ -1798,6 +1820,21 @@ fun FormularioMezclasScreen(
                                     onClick = {
                                         formula = cod
                                         expandedFormula = false
+                                        if (cod != "OTRO") {
+                                            // Reset products if switching back to a known formula
+                                            productosEvaluados = insumosList.filter { it.codigo == cod }
+                                                .sortedBy { it.numero }
+                                                .map { 
+                                                    ProductoEvaluado(
+                                                        producto = it.insumo,
+                                                        cantidad = it.cantidad,
+                                                        unidad = it.unidad,
+                                                        orden = it.numero.toString()
+                                                    ) 
+                                                }
+                                        } else {
+                                            productosEvaluados = emptyList()
+                                        }
                                     }
                                 )
                             }
@@ -1826,7 +1863,7 @@ fun FormularioMezclasScreen(
                 }
 
                 // Table of components
-                if (selectedInsumos.isNotEmpty()) {
+                if (formula == "OTRO" || selectedInsumos.isNotEmpty()) {
                     Text(text = "Validación de Productos:", fontWeight = FontWeight.Bold, color = Color.Black)
                     
                     Card(
@@ -1835,60 +1872,134 @@ fun FormularioMezclasScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                                Text("Insumo", fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
-                                Text("Vol.", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                Text("Aplicó?", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                            if (formula != "OTRO") {
+                                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                                    Text("Insumo", fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
+                                    Text("Vol.", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                    Text("Aplicó?", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                                }
+                                androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.5f))
                             }
-                            androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.5f))
                             
                             productosEvaluados.forEachIndexed { index, pe ->
-                                val insumo = selectedInsumos.getOrNull(index)
-                                if (insumo != null) {
-                                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                    if (formula == "OTRO") {
+                                        OutlinedTextField(
+                                            value = pe.producto,
+                                            onValueChange = { 
+                                                val m = productosEvaluados.toMutableList()
+                                                m[index] = pe.copy(producto = it)
+                                                productosEvaluados = m
+                                            },
+                                            label = { Text("Nombre Producto") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = blackTextFieldColors()
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            OutlinedTextField(
+                                                value = pe.orden,
+                                                onValueChange = { 
+                                                    val m = productosEvaluados.toMutableList()
+                                                    m[index] = pe.copy(orden = it)
+                                                    productosEvaluados = m
+                                                },
+                                                label = { Text("Orden") },
+                                                modifier = Modifier.weight(1f),
+                                                colors = blackTextFieldColors()
+                                            )
+                                            OutlinedTextField(
+                                                value = pe.cantidad,
+                                                onValueChange = { 
+                                                    val m = productosEvaluados.toMutableList()
+                                                    m[index] = pe.copy(cantidad = it)
+                                                    productosEvaluados = m
+                                                },
+                                                label = { Text("Volumen") },
+                                                modifier = Modifier.weight(1.5f),
+                                                colors = blackTextFieldColors()
+                                            )
+                                            OutlinedTextField(
+                                                value = pe.unidad,
+                                                onValueChange = { 
+                                                    val m = productosEvaluados.toMutableList()
+                                                    m[index] = pe.copy(unidad = it)
+                                                    productosEvaluados = m
+                                                },
+                                                label = { Text("Unidad") },
+                                                modifier = Modifier.weight(1f),
+                                                colors = blackTextFieldColors()
+                                            )
+                                        }
+                                    } else {
                                         Text(
-                                            text = "${insumo.insumo} (${insumo.cantidad} ${insumo.unidad})",
+                                            text = "${pe.producto} (${pe.cantidad} ${pe.unidad})",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.Black
                                         )
-                                        
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Start
-                                        ) {
-                                            Text("¿Aplicó?", fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
-                                            RadioButton(selected = pe.cumple, onClick = {
-                                                val m = productosEvaluados.toMutableList()
-                                                m[index] = pe.copy(cumple = true)
-                                                productosEvaluados = m
-                                            }, modifier = Modifier.size(24.dp))
-                                            Text("Sí", fontSize = 12.sp)
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            RadioButton(selected = !pe.cumple, onClick = {
-                                                val m = productosEvaluados.toMutableList()
-                                                m[index] = pe.copy(cumple = false)
-                                                productosEvaluados = m
-                                            }, modifier = Modifier.size(24.dp))
-                                            Text("No", fontSize = 12.sp)
-                                        }
-                                        if (!pe.cumple) {
-                                            OutlinedTextField(
-                                                value = pe.reemplazo,
-                                                onValueChange = { 
-                                                    val m = productosEvaluados.toMutableList()
-                                                    m[index] = pe.copy(reemplazo = it)
-                                                    productosEvaluados = m
-                                                },
-                                                label = { Text("Reemplazo") },
-                                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                                colors = blackTextFieldColors(),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                        }
-                                        androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
                                     }
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Start
+                                    ) {
+                                        Text("¿Aplicó?", fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+                                        RadioButton(selected = pe.cumple, onClick = {
+                                            val m = productosEvaluados.toMutableList()
+                                            m[index] = pe.copy(cumple = true)
+                                            productosEvaluados = m
+                                        }, modifier = Modifier.size(24.dp))
+                                        Text("Sí", fontSize = 12.sp)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        RadioButton(selected = !pe.cumple, onClick = {
+                                            val m = productosEvaluados.toMutableList()
+                                            m[index] = pe.copy(cumple = false)
+                                            productosEvaluados = m
+                                        }, modifier = Modifier.size(24.dp))
+                                        Text("No", fontSize = 12.sp)
+                                        
+                                        if (formula == "OTRO") {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                            IconButton(onClick = {
+                                                val m = productosEvaluados.toMutableList()
+                                                m.removeAt(index)
+                                                productosEvaluados = m
+                                            }) {
+                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!pe.cumple) {
+                                        OutlinedTextField(
+                                            value = pe.reemplazo,
+                                            onValueChange = { 
+                                                val m = productosEvaluados.toMutableList()
+                                                m[index] = pe.copy(reemplazo = it)
+                                                productosEvaluados = m
+                                            },
+                                            label = { Text("Reemplazo") },
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                            colors = blackTextFieldColors(),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                    }
+                                    androidx.compose.material3.HorizontalDivider(color = Color.Black.copy(alpha = 0.2f))
+                                }
+                            }
+                            
+                            if (formula == "OTRO") {
+                                Button(
+                                    onClick = { 
+                                        productosEvaluados = productosEvaluados + ProductoEvaluado(producto = "")
+                                    },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Agregar Producto")
                                 }
                             }
                         }
