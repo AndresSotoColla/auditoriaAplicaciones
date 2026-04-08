@@ -891,6 +891,11 @@ fun FormularioAuditoriaScreen(
     var calcError by rememberSaveable { mutableStateOf(0f) }
     var gpsStatus by rememberSaveable { mutableStateOf(if (calcDistance > 0) "Medición completada." else "Listo para medir") }
 
+    // --- Modo Manual ---
+    var isManualMode by rememberSaveable { mutableStateOf(false) }
+    var manualDistance by rememberSaveable { mutableStateOf(if (info.distanciaMetros > 0f) info.distanciaMetros.toString() else "") }
+
+
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -1305,7 +1310,22 @@ fun FormularioAuditoriaScreen(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
                 // --- Medición de Desplazamiento ---
-                Text(text = "Medición de Desplazamiento (GPS)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color.Black)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isManualMode) "Medición Manual" else "Medición GPS",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.Black
+                    )
+                    
+                    TextButton(onClick = { isManualMode = !isManualMode }) {
+                        Text(if (isManualMode) "CAMBIAR A GPS" else "CAMBIAR A MANUAL")
+                    }
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1314,82 +1334,119 @@ fun FormularioAuditoriaScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = gpsStatus, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 16.dp))
+                        
+                        if (!isManualMode) {
+                            Text(text = gpsStatus, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 16.dp))
+                        } else {
+                            Text(text = "Modo Manual: Use el cronómetro y digite la distancia.", fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
+                        }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    FilledTonalButton(
-                        modifier = Modifier.weight(1f),
-                        enabled = !isMeasuring,
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF4CAF50)),
-                        onClick = {
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                                requestPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                                return@FilledTonalButton
-                            }
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                            FilledTonalButton(
+                                modifier = Modifier.weight(1f),
+                                enabled = !isMeasuring,
+                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF4CAF50)),
+                                onClick = {
+                                    if (!isManualMode) {
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                            requestPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                                            return@FilledTonalButton
+                                        }
 
-                            gpsStatus = "Obteniendo ubicación inicial..."
-                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
-                                .addOnSuccessListener { location: Location? ->
-                                    if (location != null) {
-                                        startLat = location.latitude
-                                        startLng = location.longitude
-                                        startAcc = location.accuracy
+                                        gpsStatus = "Obteniendo ubicación inicial..."
+                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
+                                            .addOnSuccessListener { location: Location? ->
+                                                if (location != null) {
+                                                    startLat = location.latitude
+                                                    startLng = location.longitude
+                                                    startAcc = location.accuracy
+                                                    startTime = System.currentTimeMillis()
+                                                    isMeasuring = true
+                                                    gpsStatus = "Midiendo... Camine y luego detenga."
+                                                    calcError = location.accuracy
+                                                } else {
+                                                    gpsStatus = "Error: Active GPS/Espere señal"
+                                                }
+                                            }
+                                    } else {
+                                        // Manual Mode Timer
                                         startTime = System.currentTimeMillis()
                                         isMeasuring = true
-                                        gpsStatus = "Midiendo... Camine y luego detenga."
-                                        calcError = location.accuracy
-                                    } else {
-                                        gpsStatus = "Error: Active GPS/Espere señal"
                                     }
                                 }
-                        }
-                    ) {
-                        Text("Iniciar", color = androidx.compose.ui.graphics.Color.White)
-                    }
+                            ) {
+                                Text("Iniciar", color = androidx.compose.ui.graphics.Color.White)
+                            }
 
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        enabled = isMeasuring,
-                        colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
-                        onClick = {
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                gpsStatus = "Obteniendo ubicación final..."
-                                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
-                                    .addOnSuccessListener { location: Location? ->
-                                        if (location != null && startLat != 0.0) {
-                                            
-                                            // Recreate startLocation
-                                            val startLocationObj = Location("").apply {
-                                                latitude = startLat
-                                                longitude = startLng
-                                            }
-
-                                            val eTime = System.currentTimeMillis()
-                                            
-                                            calcTimeSec = (eTime - startTime) / 1000
-                                            calcDistance = startLocationObj.distanceTo(location)
-                                            
-                                            // v = d(m) / t(s) * 3.6 = km/h
-                                            if (calcTimeSec > 0) {
-                                                calcSpeed = (calcDistance / calcTimeSec) * 3.6f
-                                            }
-                                            
-                                            calcError = (startAcc + location.accuracy) / 2f
-                                            isMeasuring = false
-                                            gpsStatus = "Medición completada."
-                                        } else {
-                                            gpsStatus = "Error obteniendo posición final."
-                                            isMeasuring = false
+                            Button(
+                                modifier = Modifier.weight(1f),
+                                enabled = isMeasuring,
+                                colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
+                                onClick = {
+                                    if (!isManualMode) {
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                            gpsStatus = "Obteniendo ubicación final..."
+                                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
+                                                .addOnSuccessListener { location: Location? ->
+                                                    if (location != null && startLat != 0.0) {
+                                                        val startLocationObj = Location("").apply {
+                                                            latitude = startLat
+                                                            longitude = startLng
+                                                        }
+                                                        val eTime = System.currentTimeMillis()
+                                                        calcTimeSec = (eTime - startTime) / 1000
+                                                        calcDistance = startLocationObj.distanceTo(location)
+                                                        if (calcTimeSec > 0) {
+                                                            calcSpeed = (calcDistance / calcTimeSec) * 3.6f
+                                                        }
+                                                        calcError = (startAcc + location.accuracy) / 2f
+                                                        isMeasuring = false
+                                                        gpsStatus = "Medición completada."
+                                                    } else {
+                                                        gpsStatus = "Error obteniendo posición final."
+                                                        isMeasuring = false
+                                                    }
+                                                }
+                                        }
+                                    } else {
+                                        // Manual Mode stop
+                                        val eTime = System.currentTimeMillis()
+                                        calcTimeSec = (eTime - startTime) / 1000
+                                        isMeasuring = false
+                                        
+                                        val dist = manualDistance.toFloatOrNull() ?: 0f
+                                        if (dist > 0 && calcTimeSec > 0) {
+                                            calcSpeed = (dist / calcTimeSec) * 3.6f
+                                            calcDistance = dist
                                         }
                                     }
+                                }
+                            ) {
+                                Text("Detener", color = androidx.compose.ui.graphics.Color.White)
                             }
                         }
-                    ) {
-                        Text("Detener", color = androidx.compose.ui.graphics.Color.White)
+                        
+                        if (isManualMode) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            OutlinedTextField(
+                                value = manualDistance,
+                                onValueChange = { 
+                                    manualDistance = it
+                                    val dist = it.toFloatOrNull() ?: 0f
+                                    if (dist > 0 && calcTimeSec > 0) {
+                                        calcSpeed = (dist / calcTimeSec) * 3.6f
+                                        calcDistance = dist
+                                    }
+                                },
+                                label = { Text("Distancia Manual (metros)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = blackTextFieldColors(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
                     }
                 }
-            }
-        }
 
                 // Resultados
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1753,7 +1810,9 @@ object ExportManager {
                 "CodTractor", "CodImplemento", "PotTractor", "PotTDF", "Formula", 
                 "Presion", "Volumen", "Velocidad GPS", "Distancia GPS",
                 "BoquillasTapadas", "NumTapadas", "PresenciaPersonal", "AlturaUniforme", 
-                "EstadoVia", "PapelHidro", "Gotas1cm2", "Gotas1/4cm2"
+                "EstadoVia", "PapelHidro", "Gotas1cm2", "Gotas1/4cm2",
+                "B1_ID", "B1_Pres", "B1_Vol", "B2_ID", "B2_Pres", "B2_Vol",
+                "B3_ID", "B3_Pres", "B3_Vol", "B4_ID", "B4_Pres", "B4_Vol"
             )
             
             val mezclasHeaders = arrayOf(
@@ -1832,6 +1891,17 @@ object ExportManager {
                 row.createCell(21).setCellValue(if (audit.papelHidrosensible) "SI" else "NO")
                 row.createCell(22).setCellValue(audit.papelGotas1cm)
                 row.createCell(23).setCellValue(audit.papelGotasCuarto)
+                
+                // --- Nozzles Serialized ---
+                val allNozzles = audit.nozzlesIzquierdo + audit.nozzlesDerecho
+                for (i in 0 until 4) {
+                    if (i < allNozzles.size) {
+                        val n = allNozzles[i]
+                        row.createCell(24 + (i * 3)).setCellValue(n.id.toDouble())
+                        row.createCell(25 + (i * 3)).setCellValue(n.presion)
+                        row.createCell(26 + (i * 3)).setCellValue(n.volumen)
+                    }
+                }
                 }
             }
 
