@@ -765,6 +765,11 @@ fun FormularioAuditoriaScreen(
         insumosList.firstOrNull { it.codigo == info.formula }?.descripcion ?: ""
     ) }
 
+    val tractorList = remember { List(41) { "TA-${(it + 1).toString().padStart(2, '0')}" } }
+    val implementList = remember { List(81) { "IA-${(it + 1).toString().padStart(2, '0')}" } }
+    var expandedTractor by rememberSaveable { mutableStateOf(false) }
+    var expandedImplement by rememberSaveable { mutableStateOf(false) }
+
     // --- Lógica Boquillas Aleatorias ---
     var leftNozzles by rememberSaveable { mutableStateOf(info.nozzlesIzquierdo) }
     var rightNozzles by rememberSaveable { mutableStateOf(info.nozzlesDerecho) }
@@ -864,8 +869,78 @@ fun FormularioAuditoriaScreen(
 
                 // --- Form Fields ---
                 OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                OutlinedTextField(value = codTractor, onValueChange = { codTractor = it }, label = { Text("Cód. Tractor") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                OutlinedTextField(value = codImplemento, onValueChange = { codImplemento = it }, label = { Text("Cód. Implemento") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                
+                ExposedDropdownMenuBox(
+                    expanded = expandedTractor,
+                    onExpandedChange = { expandedTractor = !expandedTractor },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = codTractor,
+                        onValueChange = { 
+                            codTractor = it
+                            expandedTractor = true
+                        },
+                        label = { Text("Cód. Tractor") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                    val filteredTractors = tractorList.filter { it.contains(codTractor, ignoreCase = true) }
+                    if (filteredTractors.isNotEmpty() && expandedTractor) {
+                        DropdownMenu(
+                            expanded = expandedTractor,
+                            onDismissRequest = { expandedTractor = false },
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                        ) {
+                            filteredTractors.forEach { cod ->
+                                DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        codTractor = cod
+                                        expandedTractor = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedImplement,
+                    onExpandedChange = { expandedImplement = !expandedImplement },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = codImplemento,
+                        onValueChange = { 
+                            codImplemento = it
+                            expandedImplement = true
+                        },
+                        label = { Text("Cód. Implemento") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                    val filteredImplements = implementList.filter { it.contains(codImplemento, ignoreCase = true) }
+                    if (filteredImplements.isNotEmpty() && expandedImplement) {
+                        DropdownMenu(
+                            expanded = expandedImplement,
+                            onDismissRequest = { expandedImplement = false },
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                        ) {
+                            filteredImplements.forEach { cod ->
+                                DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        codImplemento = cod
+                                        expandedImplement = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
                 OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 
@@ -891,7 +966,7 @@ fun FormularioAuditoriaScreen(
                         DropdownMenu(
                             expanded = expandedFormula,
                             onDismissRequest = { expandedFormula = false },
-                            modifier = Modifier.exposedDropdownSize()
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
                         ) {
                             filteredCodigos.forEach { cod ->
                                 DropdownMenuItem(
