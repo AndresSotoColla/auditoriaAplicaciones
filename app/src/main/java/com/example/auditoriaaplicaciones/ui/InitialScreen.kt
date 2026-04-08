@@ -699,9 +699,21 @@ fun DatosGeneralesScreen(
             onValueChange = { 
                 if (it.isEmpty()) {
                     lote = it
+                    finca = ""
                 } else if (it.all { char -> char.isDigit() }) {
-                    if ((it.toIntOrNull() ?: 0) <= 87) {
+                    val loteInt = it.toIntOrNull() ?: 0
+                    if (loteInt <= 87) {
                         lote = it 
+                        finca = when (loteInt) {
+                            in 1..20 -> "LA FE"
+                            in 21..27 -> "SULTANA"
+                            in 28..39 -> "JAMAICA"
+                            in 40..55 -> "EGIPTO"
+                            in 56..65 -> "AMÉRICAS"
+                            in 66..76 -> "BRASIL"
+                            in 77..87 -> "ARGENTINA"
+                            else -> ""
+                        }
                     }
                 }
             },
