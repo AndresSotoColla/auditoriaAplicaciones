@@ -9,6 +9,7 @@ import android.os.Environment
 import android.os.Parcelable
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -255,17 +256,23 @@ fun InitialScreen(
                     }
                 }
                 "Historial" -> {
+                    BackHandler { currentScreen = "Menu" }
                     HistorialScreen(
                         onBack = { currentScreen = "Menu" }
                     )
                 }
                 "SprayBoom" -> {
+                    BackHandler { currentScreen = "Menu" }
                     SprayBoomChecklist(
                         onBack = { currentScreen = "Menu" },
                         onContinue = { currentScreen = "DatosGenerales" }
                     )
                 }
                 "DatosGenerales" -> {
+                    BackHandler {
+                        if (auditoriaInfo.tipoAuditoria == "Mezclas") currentScreen = "Menu"
+                        else currentScreen = "SprayBoom"
+                    }
                     DatosGeneralesScreen(
                         infoInicial = auditoriaInfo,
                         onBack = { 
@@ -284,6 +291,7 @@ fun InitialScreen(
                     )
                 }
                 "FormularioAuditoria" -> {
+                    BackHandler { currentScreen = "DatosGenerales" }
                     FormularioAuditoriaScreen(
                         info = auditoriaInfo,
                         onBack = { currentScreen = "DatosGenerales" },
@@ -296,6 +304,7 @@ fun InitialScreen(
                     )
                 }
                 "FormularioMezclas" -> {
+                    BackHandler { currentScreen = "DatosGenerales" }
                     FormularioMezclasScreen(
                         info = auditoriaInfo,
                         onBack = { currentScreen = "DatosGenerales" },
