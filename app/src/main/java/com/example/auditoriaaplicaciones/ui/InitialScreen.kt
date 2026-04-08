@@ -1615,6 +1615,14 @@ fun FormularioMezclasScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                Text(
+                    text = "Preparación de Mezclas",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    textAlign = TextAlign.Center
+                )
                 // Header (General Info)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1637,10 +1645,10 @@ fun FormularioMezclasScreen(
                         
                         if (info.phAgua.isNotEmpty() || info.durezaAgua.isNotEmpty() || info.ceAgua.isNotEmpty()) {
                             androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.1f))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                if (info.phAgua.isNotEmpty()) Text("pH: ${info.phAgua}", fontSize = 13.sp)
-                                if (info.durezaAgua.isNotEmpty()) Text("Dureza: ${info.durezaAgua}", fontSize = 13.sp)
-                                if (info.ceAgua.isNotEmpty()) Text("CE: ${info.ceAgua} mS/cm", fontSize = 13.sp)
+                            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (info.phAgua.isNotEmpty()) Text("pH Inicial: ${info.phAgua}", fontSize = 14.sp)
+                                if (info.durezaAgua.isNotEmpty()) Text("Dureza Agua: ${info.durezaAgua}", fontSize = 14.sp)
+                                if (info.ceAgua.isNotEmpty()) Text("CE Agua: ${info.ceAgua} mS/cm", fontSize = 14.sp)
                             }
                         }
                     }
@@ -1715,7 +1723,7 @@ fun FormularioMezclasScreen(
 
                 // Table of components
                 if (selectedInsumos.isNotEmpty()) {
-                    Text(text = "Componentes de la Fórmula:", fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text(text = "Validación de Productos:", fontWeight = FontWeight.Bold, color = Color.Black)
                     
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -1733,27 +1741,33 @@ fun FormularioMezclasScreen(
                             productosEvaluados.forEachIndexed { index, pe ->
                                 val insumo = selectedInsumos.getOrNull(index)
                                 if (insumo != null) {
-                                    Column {
-                                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text(insumo.insumo, modifier = Modifier.weight(2f), fontSize = 12.sp)
-                                            Text("${insumo.cantidad} ${insumo.unidad}", modifier = Modifier.weight(1f), fontSize = 12.sp)
-                                            Row(modifier = Modifier.weight(1.5f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
-                                                RadioButton(selected = pe.cumple, onClick = {
-                                                    val m = productosEvaluados.toMutableList()
-                                                    m[index] = pe.copy(cumple = true)
-                                                    productosEvaluados = m
-                                                }, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Sí", fontSize = 12.sp)
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                RadioButton(selected = !pe.cumple, onClick = {
-                                                    val m = productosEvaluados.toMutableList()
-                                                    m[index] = pe.copy(cumple = false)
-                                                    productosEvaluados = m
-                                                }, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("No", fontSize = 12.sp)
-                                            }
+                                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                        Text(
+                                            text = "${insumo.insumo} (${insumo.cantidad} ${insumo.unidad})",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Black
+                                        )
+                                        
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Start
+                                        ) {
+                                            Text("¿Aplicó?", fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+                                            RadioButton(selected = pe.cumple, onClick = {
+                                                val m = productosEvaluados.toMutableList()
+                                                m[index] = pe.copy(cumple = true)
+                                                productosEvaluados = m
+                                            }, modifier = Modifier.size(24.dp))
+                                            Text("Sí", fontSize = 12.sp)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            RadioButton(selected = !pe.cumple, onClick = {
+                                                val m = productosEvaluados.toMutableList()
+                                                m[index] = pe.copy(cumple = false)
+                                                productosEvaluados = m
+                                            }, modifier = Modifier.size(24.dp))
+                                            Text("No", fontSize = 12.sp)
                                         }
                                         if (!pe.cumple) {
                                             OutlinedTextField(
