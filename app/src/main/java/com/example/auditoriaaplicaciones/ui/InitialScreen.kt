@@ -962,16 +962,19 @@ fun FormularioAuditoriaScreen(
                 ) {
                     OutlinedTextField(
                         value = formula,
-                        onValueChange = { },
+                        onValueChange = { 
+                            formula = it
+                            expandedFormula = true
+                        },
                         label = { Text("Fórmula a aplicar") },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         shape = RoundedCornerShape(12.dp),
                         colors = blackTextFieldColors(),
-                        readOnly = true,
+                        readOnly = false,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
                     )
                     
-                val filteredCodigos = codigosUnicos.toMutableList()
+                val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.toMutableList()
                 if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
                 
                 if (filteredCodigos.isNotEmpty() && expandedFormula) {
@@ -1804,16 +1807,19 @@ fun FormularioMezclasScreen(
                 ) {
                     OutlinedTextField(
                         value = formula,
-                        onValueChange = { },
+                        onValueChange = { 
+                            formula = it
+                            expandedFormula = true
+                        },
                         label = { Text("Fórmula a mezclar") },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         shape = RoundedCornerShape(12.dp),
                         colors = blackTextFieldColors(),
-                        readOnly = true,
+                        readOnly = false,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
                     )
                     
-                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
+                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.toMutableList()
                     if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
 
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
