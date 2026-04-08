@@ -802,7 +802,6 @@ fun FormularioAuditoriaScreen(
     }
 
     // --- Lógica Medición GPS ---
-    val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var isMeasuring by rememberSaveable { mutableStateOf(false) }
     var startTime by rememberSaveable { mutableStateOf(0L) }
@@ -1137,7 +1136,7 @@ fun FormularioAuditoriaScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f), contentColor = Color.Black),
-                    shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors(),
+                    shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1814,7 +1813,7 @@ fun FormularioMezclasScreen(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
                     )
                     
-                    val filteredCodigos = codigosUnicos.toMutableList()
+                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
                     if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
 
                     if (filteredCodigos.isNotEmpty() && expandedFormula) {
