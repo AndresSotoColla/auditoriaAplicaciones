@@ -30,6 +30,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -316,26 +319,31 @@ fun MainMenu(
     onHistorialClick: () -> Unit,
     onDescargarExcelClick: () -> Unit
 ) {
+
+    val beigeClaro = Color(0xFFF9EBD7) // 🔥 más claro que el anterior
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.weight(1f))
-        
+
+        // 🔽 BAJAR UN POCO EL TÍTULO
+        Spacer(modifier = Modifier.height(24.dp))
+
         Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Auditoria APLICACIONES",
+                text = "Auditoria Aplicaciones",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 textAlign = TextAlign.Center,
                 color = Color.Black
             )
+
             Text(
                 text = "auditorias generales",
                 style = MaterialTheme.typography.titleMedium,
@@ -344,35 +352,46 @@ fun MainMenu(
             )
         }
 
-        MenuButton(
-            text = "Auditoría Aplicaciones",
-            icon = Icons.Default.Checklist,
-            onClick = onAuditoriaClick
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MenuButton(
-            text = "Ver Historial",
-            icon = Icons.Default.History,
-            onClick = onHistorialClick
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MenuButton(
-            text = "Descargar Excel",
-            icon = Icons.Default.Download,
-            onClick = onDescargarExcelClick
-        )
-        
         Spacer(modifier = Modifier.weight(1f))
-        
+
+        // 🎯 BOTONES
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            MenuButton(
+                text = "Auditoría Aplicaciones",
+                icon = Icons.Default.Checklist,
+                onClick = onAuditoriaClick
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            MenuButton(
+                text = "Ver Historial",
+                icon = Icons.Default.History,
+                onClick = onHistorialClick
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            MenuButton(
+                text = "Descargar Excel",
+                icon = Icons.Default.Download,
+                onClick = onDescargarExcelClick
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // 📍 FOOTER
         Text(
             text = "CT&A 2026",
             color = Color.Black,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -382,37 +401,72 @@ fun SelectionDialog(
     onDismiss: () -> Unit,
     onOptionSelected: (String) -> Unit
 ) {
+
+    val beigeOscuro = Color(0xFFEAD7BC) // 🔥 fondo
+    val beigeClaro = Color(0xFFF5E1C8)  // 🔥 botones
+
     AlertDialog(
         onDismissRequest = onDismiss,
+
+        // 🎨 FONDO DEL DIALOG
+        containerColor = beigeOscuro,
+
         title = {
             Text(
                 text = "Seleccione la Auditoría",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = Color.Black // 🔥 título negro
             )
         },
+
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+
                 Button(
                     onClick = { onOptionSelected("Mezclas") },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = beigeClaro,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("AUDITORÍA MEZCLAS", fontSize = 16.sp)
+                    Text(
+                        "AUDITORÍA MEZCLAS",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
+
                 Button(
                     onClick = { onOptionSelected("Spray Boom") },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = beigeClaro,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("AUDITORÍA SPRAY BOOM", fontSize = 16.sp)
+                    Text(
+                        "AUDITORÍA SPRAY BOOM",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         },
+
         confirmButton = {},
+
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(
+                    "Cancelar",
+                    color = Color.Black
+                )
             }
         }
     )
@@ -854,25 +908,81 @@ fun FormularioAuditoriaScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // --- Header Section ---
+                Text(
+                    text = "Aplicación con Spray Boom",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
+// --- Header Section ---
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.5f),
+                        contentColor = Color.Black
+                    ),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = "Resumen de Auditoría", fontWeight = FontWeight.Bold, color = Color.Black)
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+
+                        Text(
+                            text = "Resumen de Auditoría",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "Evaluador: ${info.evaluador}",
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text(
+                            text = "Finca: ${info.finca}",
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Eval: ${info.evaluador}", fontSize = 14.sp)
-                            Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Fecha: ${dateFormatter.format(Date(info.fecha))}", fontSize = 14.sp)
-                            Text(text = "Hora: ${info.hora}", fontSize = 14.sp)
-                        }
-                        Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
+
+                        Text(
+                            text = "Fecha: ${dateFormatter.format(Date(info.fecha))}",
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text(
+                            text = "Hora: ${info.hora}",
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Lote: ${info.lote}",
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
 
@@ -954,77 +1064,117 @@ fun FormularioAuditoriaScreen(
                 }
                 OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                
+
+                val focusRequester = remember { FocusRequester() }
+                var isFocused by remember { mutableStateOf(false) }
+
                 ExposedDropdownMenuBox(
                     expanded = expandedFormula,
-                    onExpandedChange = { expandedFormula = !expandedFormula },
+                    onExpandedChange = {
+                        expandedFormula = !expandedFormula
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+
                     OutlinedTextField(
                         value = formula,
-                        onValueChange = { 
-                            formula = it
-                            expandedFormula = true
+                        onValueChange = { newValue ->
+                            formula = newValue
+                            // ❌ NO abrir dropdown aquí (evita que se cierre el teclado)
                         },
                         label = { Text("Fórmula a aplicar") },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                            .focusRequester(focusRequester)
+                            .onFocusChanged {
+                                isFocused = it.isFocused
+                                expandedFormula = it.isFocused // ✅ solo abre con foco
+                            },
                         shape = RoundedCornerShape(12.dp),
                         colors = blackTextFieldColors(),
-                        readOnly = false,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
+                        singleLine = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula)
+                        }
                     )
-                    
-                val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.toMutableList()
-                if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
-                
-                if (filteredCodigos.isNotEmpty() && expandedFormula) {
-                    DropdownMenu(
-                        expanded = expandedFormula,
-                        onDismissRequest = { expandedFormula = false },
-                        modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
-                    ) {
-                        filteredCodigos.forEach { cod ->
-                            DropdownMenuItem(
-                                text = { Text(cod, color = Color.Black) },
-                                onClick = {
-                                    formula = cod
-                                    expandedFormula = false
-                                    if (cod != "OTRO") {
-                                        val match = insumosList.firstOrNull { it.codigo == cod }
-                                        selectedDescripcion = match?.descripcion ?: ""
-                                        
-                                        val aguaMatch = insumosList.firstOrNull { it.codigo == cod && it.insumo.equals("AGUA", ignoreCase = true) }
-                                        if (aguaMatch != null) {
-                                            volumen = aguaMatch.cantidad
+
+                    val filteredCodigos = codigosUnicos
+                        .filter { it.contains(formula, ignoreCase = true) }
+                        .sorted()
+                        .toMutableList()
+
+                    if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
+
+                    if (expandedFormula && filteredCodigos.isNotEmpty()) {
+
+                        DropdownMenu(
+                            expanded = expandedFormula,
+                            onDismissRequest = { expandedFormula = false },
+                            modifier = Modifier
+                                .exposedDropdownSize()
+                                .heightIn(max = 250.dp) // ✅ evita crecimiento infinito
+                                .background(Color(0xFFEAD7BC))
+                        ) {
+
+                            filteredCodigos.forEach { cod ->
+
+                                DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        formula = cod
+                                        expandedFormula = false
+
+                                        if (cod != "OTRO") {
+                                            val match = insumosList.firstOrNull { it.codigo == cod }
+                                            selectedDescripcion = match?.descripcion ?: ""
+
+                                            val aguaMatch = insumosList.firstOrNull {
+                                                it.codigo == cod && it.insumo.equals("AGUA", ignoreCase = true)
+                                            }
+
+                                            if (aguaMatch != null) {
+                                                volumen = aguaMatch.cantidad
+                                            }
+
+                                            manualFormulaName = ""
                                         }
-                                        manualFormulaName = ""
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
-            }
-            if (formula == "OTRO") {
-                OutlinedTextField(
-                    value = manualFormulaName,
-                    onValueChange = { manualFormulaName = it },
-                    label = { Text("Nombre de la Fórmula (Manual)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
-                OutlinedTextField(
-                    value = selectedDescripcion,
-                    onValueChange = { selectedDescripcion = it },
-                    label = { Text("Descripción de la Fórmula") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
-            } else if (selectedDescripcion.isNotEmpty()) {
-                Text(text = "Descripción: $selectedDescripcion", color = Color.DarkGray, fontSize = 14.sp)
-            }
+
+// 🔽 CAMPOS ADICIONALES
+                if (formula == "OTRO") {
+
+                    OutlinedTextField(
+                        value = manualFormulaName,
+                        onValueChange = { manualFormulaName = it },
+                        label = { Text("Nombre de la Fórmula (Manual)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+
+                    OutlinedTextField(
+                        value = selectedDescripcion,
+                        onValueChange = { selectedDescripcion = it },
+                        label = { Text("Descripción de la Fórmula") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+
+                } else if (selectedDescripcion.isNotEmpty()) {
+
+                    Text(
+                        text = "Descripción: $selectedDescripcion",
+                        color = Color.DarkGray,
+                        fontSize = 14.sp
+                    )
+                }
 
                 OutlinedTextField(value = presion, onValueChange = { presion = it }, label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = volumen, onValueChange = { volumen = it }, label = { Text("Volumen aplicar") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
@@ -1378,13 +1528,13 @@ fun MenuButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
-        shape = RoundedCornerShape(16.dp),
+            .height(56.dp), // 🔥 altura ideal (tipo Material)
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFFF5E1C8), // Beige Claro
+            containerColor = Color(0xFFF5E1C8),
             contentColor = Color.Black
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp) // más sutil
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1394,13 +1544,15 @@ fun MenuButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(24.dp) // 🔥 más proporcional
             )
-            Spacer(modifier = Modifier.width(16.dp))
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             Text(
                 text = text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -1756,36 +1908,64 @@ fun FormularioMezclasScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
                     textAlign = TextAlign.Center
                 )
-                // Header (General Info)
+
+// Header (General Info)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f), contentColor = Color.Black),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.5f),
+                        contentColor = Color.Black
+                    ),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Información General", fontWeight = FontWeight.Bold, color = Color.Black)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+
+                        Text(
+                            "Información General",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center
+                        )
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Eval: ${info.evaluador}", fontSize = 14.sp)
-                            Text("Finca: ${info.finca}", fontSize = 14.sp)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Fecha: ${dateFormatter.format(java.util.Date(info.fecha))}", fontSize = 14.sp)
-                            Text("Hora: ${info.hora}", fontSize = 14.sp)
-                        }
-                        Text("Lote: ${info.lote}", fontSize = 14.sp)
-                        
+
+                        Text("Evaluador: ${info.evaluador}", fontSize = 14.sp, textAlign = TextAlign.Center)
+                        Text("Finca: ${info.finca}", fontSize = 14.sp, textAlign = TextAlign.Center)
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text("Fecha: ${dateFormatter.format(java.util.Date(info.fecha))}", fontSize = 14.sp, textAlign = TextAlign.Center)
+                        Text("Hora: ${info.hora}", fontSize = 14.sp, textAlign = TextAlign.Center)
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text("Lote: ${info.lote}", fontSize = 14.sp, textAlign = TextAlign.Center)
+
                         if (info.phAgua.isNotEmpty() || info.durezaAgua.isNotEmpty() || info.ceAgua.isNotEmpty()) {
-                            androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.1f))
-                            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (info.phAgua.isNotEmpty()) Text("pH Inicial: ${info.phAgua}", fontSize = 14.sp)
-                                if (info.durezaAgua.isNotEmpty()) Text("Dureza Agua: ${info.durezaAgua}", fontSize = 14.sp)
-                                if (info.ceAgua.isNotEmpty()) Text("CE Agua: ${info.ceAgua} mS/cm", fontSize = 14.sp)
-                            }
+                            androidx.compose.material3.HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = Color.Black.copy(alpha = 0.1f)
+                            )
+
+                            if (info.phAgua.isNotEmpty())
+                                Text("pH Inicial: ${info.phAgua}", fontSize = 14.sp, textAlign = TextAlign.Center)
+
+                            if (info.durezaAgua.isNotEmpty())
+                                Text("Dureza Agua: ${info.durezaAgua}", fontSize = 14.sp, textAlign = TextAlign.Center)
+
+                            if (info.ceAgua.isNotEmpty())
+                                Text("CE Agua: ${info.ceAgua} mS/cm", fontSize = 14.sp, textAlign = TextAlign.Center)
                         }
                     }
                 }
@@ -1800,51 +1980,77 @@ fun FormularioMezclasScreen(
                     colors = blackTextFieldColors()
                 )
 
+                val focusRequester = remember { FocusRequester() }
+                var isFocused by remember { mutableStateOf(false) }
+
                 ExposedDropdownMenuBox(
                     expanded = expandedFormula,
-                    onExpandedChange = { expandedFormula = !expandedFormula },
+                    onExpandedChange = {
+                        expandedFormula = !expandedFormula
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+
                     OutlinedTextField(
                         value = formula,
-                        onValueChange = { 
-                            formula = it
-                            expandedFormula = true
+                        onValueChange = { newValue ->
+                            formula = newValue
+                            // ❌ NO tocar expanded aquí
                         },
                         label = { Text("Fórmula a mezclar") },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                            .focusRequester(focusRequester)
+                            .onFocusChanged {
+                                isFocused = it.isFocused
+                                expandedFormula = it.isFocused // 🔥 abre solo con foco
+                            },
                         shape = RoundedCornerShape(12.dp),
                         colors = blackTextFieldColors(),
-                        readOnly = false,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
+                        singleLine = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula)
+                        }
                     )
-                    
-                    val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.toMutableList()
+
+                    val filteredCodigos = codigosUnicos
+                        .filter { it.contains(formula, ignoreCase = true) }
+                        .sorted()
+                        .toMutableList()
+
                     if (!filteredCodigos.contains("OTRO")) filteredCodigos.add("OTRO")
 
-                    if (filteredCodigos.isNotEmpty() && expandedFormula) {
+                    if (expandedFormula && filteredCodigos.isNotEmpty()) {
+
                         DropdownMenu(
                             expanded = expandedFormula,
                             onDismissRequest = { expandedFormula = false },
-                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFF5E1C8))
+                            modifier = Modifier
+                                .exposedDropdownSize()
+                                .heightIn(max = 250.dp)
+                                .background(Color(0xFFF5E1C8))
                         ) {
+
                             filteredCodigos.forEach { cod ->
+
                                 DropdownMenuItem(
                                     text = { Text(cod, color = Color.Black) },
                                     onClick = {
                                         formula = cod
                                         expandedFormula = false
+
                                         if (cod != "OTRO") {
-                                            // Reset products if switching back to a known formula
-                                            productosEvaluados = insumosList.filter { it.codigo == cod }
+                                            productosEvaluados = insumosList
+                                                .filter { it.codigo == cod }
                                                 .sortedBy { it.numero }
-                                                .map { 
+                                                .map {
                                                     ProductoEvaluado(
                                                         producto = it.insumo,
                                                         cantidad = it.cantidad,
                                                         unidad = it.unidad,
                                                         orden = it.numero.toString()
-                                                    ) 
+                                                    )
                                                 }
                                         } else {
                                             productosEvaluados = emptyList()
@@ -1856,37 +2062,25 @@ fun FormularioMezclasScreen(
                     }
                 }
 
-                if (formula == "OTRO") {
-                    OutlinedTextField(
-                        value = manualFormulaName,
-                        onValueChange = { manualFormulaName = it },
-                        label = { Text("Nombre de la Fórmula (Manual)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
-                    )
-                }
-
                 // New fields for final parameters
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = phFinal,
-                        onValueChange = { phFinal = it },
-                        label = { Text("pH final") },
-                        modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                    )
-                    OutlinedTextField(
-                        value = ceFinal,
-                        onValueChange = { ceFinal = it },
-                        label = { Text("CE final (mS/cm)") },
-                        modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                    )
-                }
-
+                OutlinedTextField(
+                    value = phFinal,
+                    onValueChange = { phFinal = it },
+                    label = { Text("pH final") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+                OutlinedTextField(
+                    value = ceFinal,
+                    onValueChange = { ceFinal = it },
+                    label = { Text("CE final (mS/cm)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
                 // Table of components
                 if (formula == "OTRO" || selectedInsumos.isNotEmpty()) {
                     Text(text = "Validación de Productos:", fontWeight = FontWeight.Bold, color = Color.Black)
