@@ -1696,6 +1696,7 @@ fun FormularioMezclasScreen(
 ) {
     var mezclador by rememberSaveable { mutableStateOf(info.mezclador) }
     var formula by rememberSaveable { mutableStateOf(info.formulaMezclar) }
+    var manualFormulaName by rememberSaveable { mutableStateOf(if (info.formulaMezclar == "OTRO") "" else "") }
 
     val context = LocalContext.current
     val insumosList = remember { parseCsv(context) }
@@ -1795,14 +1796,13 @@ fun FormularioMezclasScreen(
                 ) {
                     OutlinedTextField(
                         value = formula,
-                        onValueChange = { 
-                            formula = it
-                            expandedFormula = true
-                        },
+                        onValueChange = { },
                         label = { Text("Fórmula a mezclar") },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
+                        colors = blackTextFieldColors(),
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFormula) }
                     )
                     
                     val filteredCodigos = codigosUnicos.filter { it.contains(formula, ignoreCase = true) }.take(10).toMutableList()
@@ -1840,6 +1840,17 @@ fun FormularioMezclasScreen(
                             }
                         }
                     }
+                }
+
+                if (formula == "OTRO") {
+                    OutlinedTextField(
+                        value = manualFormulaName,
+                        onValueChange = { manualFormulaName = it },
+                        label = { Text("Nombre de la Fórmula (Manual)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
                 }
 
                 // New fields for final parameters
@@ -2100,7 +2111,7 @@ fun FormularioMezclasScreen(
                         onClick = {
                             val updatedInfo = info.copy(
                                 mezclador = mezclador,
-                                formulaMezclar = formula,
+                                formulaMezclar = if (formula == "OTRO") manualFormulaName else formula,
                                 productosEvaluados = productosEvaluados,
                                 incompatibilidad = incompatibilidad,
                                 ordenMezclado = ordenMezclado,
