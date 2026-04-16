@@ -1798,6 +1798,10 @@ fun HistorialScreen(onBack: () -> Unit) {
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.Black)
                     }
@@ -1805,7 +1809,6 @@ fun HistorialScreen(onBack: () -> Unit) {
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    val coroutineScope = rememberCoroutineScope()
                     val unsyncedCount = audits.count { !it.isSynced && it.tipoAuditoria == "Spray Boom" }
                     if (unsyncedCount > 0) {
                         Button(
