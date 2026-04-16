@@ -61,6 +61,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.random.Random
+import com.example.auditoriaaplicaciones.network.SyncManager
+import kotlinx.coroutines.launch
 
 import java.io.Serializable
 
@@ -164,7 +166,10 @@ data class AuditoriaInfo(
     var estadoVia: String = "", // "BUENO", "REGULAR", "MALO"
     var papelHidrosensible: Boolean = false,
     var papelGotas1cm: String = "",
-    var tamanoGotas: String = ""
+    var tamanoGotas: String = "",
+    var ubicacion: String = "",
+    var velocidadOptima: Float = 0f,
+    var isSynced: Boolean = false
 ) : Serializable
 
 @Composable
@@ -848,6 +853,8 @@ fun FormularioAuditoriaScreen(
     var volumen by rememberSaveable { mutableStateOf(info.volumen) }
     
     val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var capturedLocation by remember { mutableStateOf("") }
     val insumosList = remember { parseCsv(context) }
     val codigosUnicos = remember(insumosList) { insumosList.map { it.codigo }.distinct() }
     var expandedFormula by rememberSaveable { mutableStateOf(false) }
@@ -1535,7 +1542,9 @@ fun FormularioAuditoriaScreen(
                                     estadoVia = estadoVia,
                                     papelHidrosensible = papelHidro,
                                     papelGotas1cm = papelGotas1cm,
-                                    tamanoGotas = tamanoGotas
+                                    tamanoGotas = tamanoGotas,
+                                    ubicacion = if (capturedLocation.isEmpty()) "0,0" else capturedLocation,
+                                    velocidadOptima = info.velocidadOptima // This was updated in the onClick of Guardar
                                 )
                                 onContinue(updatedInfo)
                             }) {
@@ -1564,26 +1573,33 @@ fun FormularioAuditoriaScreen(
                                 sb.append("\n")
                             }
 
-                            // 2. Cálculo de L/Ha
+                            // 2. Cálculo de L/Ha y Velocidad Optima
                             val nTotal = (cantidadBoquillasIzquierdas.toIntOrNull() ?: 0) + (cantidadBoquillasDerechas.toIntOrNull() ?: 0)
                             val dist = calcDistance
                             val vTime = calcTimeSec
+                            val longIzqVal = longitudBrazoIzquierdo.toFloatOrNull() ?: 0f
+                            val longDerVal = longitudBrazoDerecho.toFloatOrNull() ?: 0f
+                            val totalWidth = longIzqVal + longDerVal
                             
+                            var finalVelOptima = 0f
+
                             if (nTotal > 0 && dist > 0 && vTime > 0) {
                                 val allEvaluated = leftNozzles + rightNozzles
                                 val lhaResults = mutableListOf<Float>()
+                                val flowsMLs = mutableListOf<Float>()
                                 
                                 allEvaluated.forEach { nozzle ->
                                     val nTime = nozzle.tiempoSegundos.toFloat()
                                     val nVol = nozzle.volumen.toFloatOrNull() ?: 0f
                                     
                                     if (nTime > 0) {
-                                        val flowMLs = nVol / nTime
-                                        val totalVolTripL = (flowMLs * vTime) / 1000f
+                                        val flow = nVol / nTime
+                                        flowsMLs.add(flow)
+                                        val totalVolTripL = (flow * vTime) / 1000f
                                         
                                         // Determinar longitud del brazo
                                         val isLeft = leftNozzles.any { it.id == nozzle.id }
-                                        val armLen = (if (isLeft) longitudBrazoIzquierdo else longitudBrazoDerecho).toFloatOrNull() ?: 0f
+                                        val armLen = if (isLeft) longIzqVal else longDerVal
                                         
                                         if (armLen > 0) {
                                             val areaHa = (armLen * dist) / 10000f
@@ -1604,6 +1620,14 @@ fun FormularioAuditoriaScreen(
                                     } else {
                                         sb.append("✅ El caudal es igual o mayor a 2000 L/Ha.\n")
                                     }
+
+                                    // Cálculo de velocidad óptima para 2000 L/Ha
+                                    if (totalWidth > 0 && flowsMLs.isNotEmpty()) {
+                                        val avgFlow = flowsMLs.average().toFloat()
+                                        finalVelOptima = (avgFlow * nTotal * 36f) / (totalWidth * 2000f)
+                                        sb.append("\n💡 RECOMENDACIÓN:\n")
+                                        sb.append("- Para alcanzar 2000 L/Ha exactos, la velocidad óptima es: ${String.format(Locale.US, "%.2f", finalVelOptima)} km/h\n")
+                                    }
                                 } else {
                                     sb.append("ℹ️ No se pudo calcular L/Ha. Verifique longitudes de brazo y volumen de boquillas.\n")
                                 }
@@ -1611,8 +1635,25 @@ fun FormularioAuditoriaScreen(
                                 sb.append("ℹ️ Faltan datos (distancia, tiempo o cantidad boquillas) para el cálculo de L/Ha.\n")
                             }
 
+                            // 3. Captura GPS
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                    .addOnSuccessListener { loc: Location? ->
+                                        if (loc != null) {
+                                            capturedLocation = "${loc.latitude}, ${loc.longitude}"
+                                        }
+                                    }
+                            } else {
+                                sb.append("\n⚠️ Sin permiso de GPS: Las coordenadas no serán guardadas.\n")
+                            }
+
                             if (sb.isEmpty()) sb.append("Auditoría guardada exitosamente.")
                             recommendationMessage = sb.toString()
+                            
+                            // Guardamos temporalmente en el objeto info que recibimos
+                            info.velocidadOptima = finalVelOptima
+                            // La ubicación se captura asíncronamente en capturedLocation y será usada en el confirmButton
+                            
                             showRecommendationDialog = true
                         },
                         modifier = Modifier.weight(1f),
@@ -1757,14 +1798,35 @@ fun HistorialScreen(onBack: () -> Unit) {
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-                ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.Black)
                     }
                     Text("Historial de Muestreos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    val coroutineScope = rememberCoroutineScope()
+                    val unsyncedCount = audits.count { !it.isSynced && it.tipoAuditoria == "Spray Boom" }
+                    if (unsyncedCount > 0) {
+                        Button(
+                            onClick = {
+                                val sprayBoomAudits = audits.filter { it.tipoAuditoria == "Spray Boom" && !it.isSynced }
+                                sprayBoomAudits.forEach { audit ->
+                                    SyncManager.syncAudit(context, audit) { success, msg ->
+                                        if (success) {
+                                            audits = StorageManager.getAuditorias(context)
+                                        }
+                                    }
+                                }
+                                Toast.makeText(context, "Iniciando carga de $unsyncedCount registros...", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("SUBIR TODO", fontSize = 12.sp)
+                        }
+                    }
                 }
 
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -1805,7 +1867,23 @@ fun HistorialScreen(onBack: () -> Unit) {
                                         Text(text = "${audit.tipoAuditoria} - Finca: ${audit.finca}", fontWeight = FontWeight.Bold, color = Color.Black)
                                         Text(text = "Fecha: $dateStr - Lote: ${audit.lote}", fontSize = 14.sp, color = Color.DarkGray)
                                         Text(text = "Evaluador: ${audit.evaluador}", fontSize = 14.sp, color = Color.DarkGray)
+                                        if (audit.isSynced) {
+                                            Text(text = "✓ Sincronizado", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                                        }
                                     }
+
+                                    if (!audit.isSynced && audit.tipoAuditoria == "Spray Boom") {
+                                        IconButton(onClick = {
+                                            SyncManager.syncAudit(context, audit) { success, msg ->
+                                                if (success) {
+                                                    audits = StorageManager.getAuditorias(context)
+                                                }
+                                            }
+                                        }) {
+                                            Icon(Icons.Default.CloudUpload, contentDescription = "Sincronizar", tint = Color.Black)
+                                        }
+                                    }
+
                                     IconButton(onClick = { auditToDelete = audit.id }) {
                                         Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = androidx.compose.ui.graphics.Color.Red)
                                     }
@@ -1843,7 +1921,8 @@ object ExportManager {
                 "BoquillasTapadas", "NumTapadas", "PresenciaPersonal", "AlturaUniforme", 
                 "EstadoVia", "PapelHidro", "Gotas 1cm2", "Tamaño Gotas",
                 "B1_ID", "B1_Pres", "B1_Vol", "B1_Tiempo", "B2_ID", "B2_Pres", "B2_Vol", "B2_Tiempo",
-                "B3_ID", "B3_Pres", "B3_Vol", "B3_Tiempo", "B4_ID", "B4_Pres", "B4_Vol", "B4_Tiempo"
+                "B3_ID", "B3_Pres", "B3_Vol", "B3_Tiempo", "B4_ID", "B4_Pres", "B4_Vol", "B4_Tiempo",
+                "Ubicacion", "Vel_Optima", "Sincronizado"
             )
             
             val mezclasHeaders = arrayOf(
@@ -1939,6 +2018,9 @@ object ExportManager {
                         row.createCell(32 + (i * 4)).setCellValue(n.tiempoSegundos.toString())
                     }
                 }
+                row.createCell(45).setCellValue(audit.ubicacion)
+                row.createCell(46).setCellValue(audit.velocidadOptima.toDouble())
+                row.createCell(47).setCellValue(if (audit.isSynced) "SI" else "NO")
                 }
             }
 
