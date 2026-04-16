@@ -1811,23 +1811,25 @@ fun HistorialScreen(onBack: () -> Unit) {
                     
                     val unsyncedCount = audits.count { !it.isSynced && it.tipoAuditoria == "Spray Boom" }
                     if (unsyncedCount > 0) {
-                        Button(
+                        IconButton(
                             onClick = {
                                 val sprayBoomAudits = audits.filter { it.tipoAuditoria == "Spray Boom" && !it.isSynced }
+                                Toast.makeText(context, "Iniciando carga de $unsyncedCount registros...", Toast.LENGTH_SHORT).show()
+                                
                                 sprayBoomAudits.forEach { audit ->
                                     SyncManager.syncAudit(context, audit) { success, msg ->
-                                        if (success) {
-                                            audits = StorageManager.getAuditorias(context)
+                                        // Regresar al hilo principal para mostrar el Toast
+                                        (context as? android.app.Activity)?.runOnUiThread {
+                                            if (success) {
+                                                audits = StorageManager.getAuditorias(context)
+                                            }
+                                            Toast.makeText(context, "Registro ${audit.lote}: $msg", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
-                                Toast.makeText(context, "Iniciando carga de $unsyncedCount registros...", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            }
                         ) {
-                            Text("SUBIR TODO", fontSize = 12.sp)
+                            Icon(Icons.Default.CloudUpload, contentDescription = "Subir Todo", tint = Color.Black)
                         }
                     }
                 }
@@ -1878,8 +1880,11 @@ fun HistorialScreen(onBack: () -> Unit) {
                                     if (!audit.isSynced && audit.tipoAuditoria == "Spray Boom") {
                                         IconButton(onClick = {
                                             SyncManager.syncAudit(context, audit) { success, msg ->
-                                                if (success) {
-                                                    audits = StorageManager.getAuditorias(context)
+                                                (context as? android.app.Activity)?.runOnUiThread {
+                                                    if (success) {
+                                                        audits = StorageManager.getAuditorias(context)
+                                                    }
+                                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                                 }
                                             }
                                         }) {
