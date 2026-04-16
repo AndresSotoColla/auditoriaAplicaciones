@@ -49,12 +49,8 @@ object SyncManager {
         jsonMap["velocidad_kmh"] = audit.velocidadKmh
         jsonMap["metros_desplazamiento"] = audit.distanciaMetros
         
-        // Format seconds to HH:mm:ss
-        val totalSecs = audit.tiempoDesplazamientoSegundos
-        val h = totalSecs / 3600
-        val m = (totalSecs % 3600) / 60
-        val s = totalSecs % 60
-        jsonMap["tiempo_desplazamiento"] = String.format("%02d:%02d:%02d", h, m, s)
+        // Send raw seconds for the numeric field
+        jsonMap["tiempo_desplazamiento"] = audit.tiempoDesplazamientoSegundos.toDouble()
 
         // General Questions
         jsonMap["boquillas_tapadas"] = audit.boquillasTapadas ?: false
