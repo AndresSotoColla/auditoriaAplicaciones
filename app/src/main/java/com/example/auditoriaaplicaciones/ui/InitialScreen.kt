@@ -65,7 +65,7 @@ import kotlin.random.Random
 import java.io.Serializable
 
 // Para soportar guardado de estado ante rotaciones, los usamos como Serializable
-data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "") : Serializable
+data class NozzleData(val id: Int, var volumen: String = "", var presion: String = "", var tiempoSegundos: Int = 0) : Serializable
 data class ProductoEvaluado(
     val producto: String, 
     var cumple: Boolean = true, 
@@ -143,7 +143,11 @@ data class AuditoriaInfo(
     var phFinal: String = "",
     var ceFinal: String = "",
     
-    // Boquillas
+    // Boquillas y Brazos
+    var longitudBrazoIzquierdo: String = "",
+    var longitudBrazoDerecho: String = "",
+    var cantidadBoquillasIzquierdas: String = "",
+    var cantidadBoquillasDerechas: String = "",
     var nozzlesIzquierdo: List<NozzleData> = emptyList(),
     var nozzlesDerecho: List<NozzleData> = emptyList(),
     
@@ -858,54 +862,22 @@ fun FormularioAuditoriaScreen(
     var expandedImplement by rememberSaveable { mutableStateOf(false) }
 
     // --- Lógica Boquillas Aleatorias ---
+    var longitudBrazoIzquierdo by rememberSaveable { mutableStateOf(info.longitudBrazoIzquierdo) }
+    var longitudBrazoDerecho by rememberSaveable { mutableStateOf(info.longitudBrazoDerecho) }
+    var cantidadBoquillasIzquierdas by rememberSaveable { mutableStateOf(info.cantidadBoquillasIzquierdas) }
+    var cantidadBoquillasDerechas by rememberSaveable { mutableStateOf(info.cantidadBoquillasDerechas) }
+
     var leftNozzles by rememberSaveable { mutableStateOf(info.nozzlesIzquierdo) }
     var rightNozzles by rememberSaveable { mutableStateOf(info.nozzlesDerecho) }
 
-    LaunchedEffect(Unit) {
-        if (leftNozzles.isEmpty()) {
-            val randomLeft1 = Random.nextInt(1, 31)
-            var randomLeft2 = Random.nextInt(1, 31)
-            while (randomLeft2 == randomLeft1) { randomLeft2 = Random.nextInt(1, 31) }
-            leftNozzles = listOf(NozzleData(randomLeft1), NozzleData(randomLeft2))
-        }
-        if (rightNozzles.isEmpty()) {
-            val randomRight1 = Random.nextInt(31, 61)
-            var randomRight2 = Random.nextInt(31, 61)
-            while (randomRight2 == randomRight1) { randomRight2 = Random.nextInt(31, 61) }
-            rightNozzles = listOf(NozzleData(randomRight1), NozzleData(randomRight2))
-        }
-    }
-
-    // --- Lógica Medición GPS ---
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    // --- Lógica Medición Manual ---
     var isMeasuring by rememberSaveable { mutableStateOf(false) }
     var startTime by rememberSaveable { mutableStateOf(0L) }
-    
-    var startLat by rememberSaveable { mutableStateOf(0.0) }
-    var startLng by rememberSaveable { mutableStateOf(0.0) }
-    var startAcc by rememberSaveable { mutableStateOf(0f) }
     
     var calcDistance by rememberSaveable { mutableStateOf(info.distanciaMetros) }
     var calcTimeSec by rememberSaveable { mutableStateOf(info.tiempoDesplazamientoSegundos) }
     var calcSpeed by rememberSaveable { mutableStateOf(info.velocidadKmh) }
-    var calcError by rememberSaveable { mutableStateOf(0f) }
-    var gpsStatus by rememberSaveable { mutableStateOf(if (calcDistance > 0) "Medición completada." else "Listo para medir") }
-
-    // --- Modo Manual ---
-    var isManualMode by rememberSaveable { mutableStateOf(false) }
     var manualDistance by rememberSaveable { mutableStateOf(if (info.distanciaMetros > 0f) info.distanciaMetros.toString() else "") }
-
-
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || 
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
-            Toast.makeText(context, "Permiso GPS concedido. Ya puede medir.", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Permiso GPS denegado.", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     // --- Final Cuestionario ---
     var boquillasTapadas by rememberSaveable { mutableStateOf(info.boquillasTapadas) }
@@ -1261,8 +1233,8 @@ fun FormularioAuditoriaScreen(
                         Image(
                             painter = painterResource(id = R.drawable.referencia_boquillas),
                             contentDescription = "Referencia boquillas",
-                            modifier = Modifier.fillMaxWidth().height(200.dp),
-                            contentScale = ContentScale.Crop
+                            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+                            contentScale = ContentScale.Fit
                         )
                         Text(
                             text = "Referencia frontal boquillas",
@@ -1276,70 +1248,85 @@ fun FormularioAuditoriaScreen(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
-                // --- Boquillas Aleatorias ---
-                Text(text = "Brazo Izquierdo (Aleatorio 1-30)", fontWeight = FontWeight.Bold, color = Color.Black)
-                leftNozzles.forEachIndexed { index, nozzle ->
-                    Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
-                    OutlinedTextField(
-                        value = nozzle.volumen,
-                        onValueChange = { newValue -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newValue) } },
-                        label = { Text("Volumen (ml)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                    )
-                    OutlinedTextField(
-                        value = nozzle.presion,
-                        onValueChange = { newValue -> leftNozzles = leftNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newValue) } },
-                        label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                    )
+                OutlinedTextField(value = longitudBrazoIzquierdo, onValueChange = { longitudBrazoIzquierdo = it }, label = { Text("Longitud Brazo Izquierdo (m)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = longitudBrazoDerecho, onValueChange = { longitudBrazoDerecho = it }, label = { Text("Longitud Brazo Derecho (m)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = cantidadBoquillasDerechas, onValueChange = { cantidadBoquillasDerechas = it }, label = { Text("Cantidad Boquillas Brazo Derecho") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(value = cantidadBoquillasIzquierdas, onValueChange = { cantidadBoquillasIzquierdas = it }, label = { Text("Cantidad Boquillas Brazo Izquierdo") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+
+                Button(
+                    onClick = {
+                        val n = cantidadBoquillasDerechas.toIntOrNull() ?: 0
+                        val m = cantidadBoquillasIzquierdas.toIntOrNull() ?: 0
+                        if (n > 0) {
+                            val r1 = Random.nextInt(1, n + 1)
+                            var r2 = Random.nextInt(1, n + 1)
+                            if (n >= 2) {
+                                while (r2 == r1) { r2 = Random.nextInt(1, n + 1) }
+                                rightNozzles = listOf(NozzleData(r1), NozzleData(r2))
+                            } else {
+                                rightNozzles = listOf(NozzleData(r1))
+                            }
+                        } else {
+                            rightNozzles = emptyList()
+                        }
+                        
+                        if (m > 0) {
+                            val r1 = Random.nextInt(n + 1, n + m + 1)
+                            var r2 = Random.nextInt(n + 1, n + m + 1)
+                            if (m >= 2) {
+                                while (r2 == r1) { r2 = Random.nextInt(n + 1, n + m + 1) }
+                                leftNozzles = listOf(NozzleData(r1), NozzleData(r2))
+                            } else {
+                                leftNozzles = listOf(NozzleData(r1))
+                            }
+                        } else {
+                            leftNozzles = emptyList()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                ) {
+                    Text("Generar Boquillas Aleatorias")
                 }
 
-                Text(text = "Brazo Derecho (Aleatorio 31-60)", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 16.dp))
+                // --- Boquillas Aleatorias ---
+                Text(text = "Brazo Derecho", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 16.dp))
                 rightNozzles.forEachIndexed { index, nozzle ->
-                    Text(text = "Boquilla #${nozzle.id}", modifier = Modifier.padding(top = 8.dp))
-                    OutlinedTextField(
-                        value = nozzle.volumen,
-                        onValueChange = { newValue -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(volumen = newValue) } },
-                        label = { Text("Volumen (ml)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                    )
-                    OutlinedTextField(
-                        value = nozzle.presion,
-                        onValueChange = { newValue -> rightNozzles = rightNozzles.toMutableList().apply { this[index] = nozzle.copy(presion = newValue) } },
-                        label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-                    )
+                    key(nozzle.id) {
+                        BoquillaItem(nozzle = nozzle, onUpdate = { updated -> 
+                            rightNozzles = rightNozzles.toMutableList().apply { this[index] = updated }
+                        })
+                    }
+                }
+
+                Text(text = "Brazo Izquierdo", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(top = 16.dp))
+                leftNozzles.forEachIndexed { index, nozzle ->
+                    key(nozzle.id) {
+                        BoquillaItem(nozzle = nozzle, onUpdate = { updated -> 
+                            leftNozzles = leftNozzles.toMutableList().apply { this[index] = updated }
+                        })
+                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
                 // --- Medición de Desplazamiento ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isManualMode) "Medición Manual" else "Medición GPS",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.Black
-                    )
-                    
-                    TextButton(onClick = { isManualMode = !isManualMode }) {
-                        Text(if (isManualMode) "CAMBIAR A GPS" else "CAMBIAR A MANUAL")
-                    }
-                }
+                Text(
+                    text = "Medición Manual de Velocidad",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Black
+                )
 
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha=0.5f), contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         
-                        if (!isManualMode) {
-                            Text(text = gpsStatus, fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 16.dp))
-                        } else {
-                            Text(text = "Modo Manual: Use el cronómetro y digite la distancia.", fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
-                        }
+                        Text(text = "Modo Manual: Use el cronómetro y digite la distancia.", fontWeight = FontWeight.Medium, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
 
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                             FilledTonalButton(
@@ -1347,32 +1334,8 @@ fun FormularioAuditoriaScreen(
                                 enabled = !isMeasuring,
                                 colors = ButtonDefaults.filledTonalButtonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF4CAF50)),
                                 onClick = {
-                                    if (!isManualMode) {
-                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                                            requestPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                                            return@FilledTonalButton
-                                        }
-
-                                        gpsStatus = "Obteniendo ubicación inicial..."
-                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
-                                            .addOnSuccessListener { location: Location? ->
-                                                if (location != null) {
-                                                    startLat = location.latitude
-                                                    startLng = location.longitude
-                                                    startAcc = location.accuracy
-                                                    startTime = System.currentTimeMillis()
-                                                    isMeasuring = true
-                                                    gpsStatus = "Midiendo... Camine y luego detenga."
-                                                    calcError = location.accuracy
-                                                } else {
-                                                    gpsStatus = "Error: Active GPS/Espere señal"
-                                                }
-                                            }
-                                    } else {
-                                        // Manual Mode Timer
-                                        startTime = System.currentTimeMillis()
-                                        isMeasuring = true
-                                    }
+                                    startTime = System.currentTimeMillis()
+                                    isMeasuring = true
                                 }
                             ) {
                                 Text("Iniciar", color = androidx.compose.ui.graphics.Color.White)
@@ -1383,42 +1346,14 @@ fun FormularioAuditoriaScreen(
                                 enabled = isMeasuring,
                                 colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFE53935)),
                                 onClick = {
-                                    if (!isManualMode) {
-                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                            gpsStatus = "Obteniendo ubicación final..."
-                                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
-                                                .addOnSuccessListener { location: Location? ->
-                                                    if (location != null && startLat != 0.0) {
-                                                        val startLocationObj = Location("").apply {
-                                                            latitude = startLat
-                                                            longitude = startLng
-                                                        }
-                                                        val eTime = System.currentTimeMillis()
-                                                        calcTimeSec = (eTime - startTime) / 1000
-                                                        calcDistance = startLocationObj.distanceTo(location)
-                                                        if (calcTimeSec > 0) {
-                                                            calcSpeed = (calcDistance / calcTimeSec) * 3.6f
-                                                        }
-                                                        calcError = (startAcc + location.accuracy) / 2f
-                                                        isMeasuring = false
-                                                        gpsStatus = "Medición completada."
-                                                    } else {
-                                                        gpsStatus = "Error obteniendo posición final."
-                                                        isMeasuring = false
-                                                    }
-                                                }
-                                        }
-                                    } else {
-                                        // Manual Mode stop
-                                        val eTime = System.currentTimeMillis()
-                                        calcTimeSec = (eTime - startTime) / 1000
-                                        isMeasuring = false
-                                        
-                                        val dist = manualDistance.toFloatOrNull() ?: 0f
-                                        if (dist > 0 && calcTimeSec > 0) {
-                                            calcSpeed = (dist / calcTimeSec) * 3.6f
-                                            calcDistance = dist
-                                        }
+                                    val eTime = System.currentTimeMillis()
+                                    calcTimeSec = (eTime - startTime) / 1000
+                                    isMeasuring = false
+                                    
+                                    val dist = manualDistance.toFloatOrNull() ?: 0f
+                                    if (dist > 0 && calcTimeSec > 0) {
+                                        calcSpeed = (dist / calcTimeSec) * 3.6f
+                                        calcDistance = dist
                                     }
                                 }
                             ) {
@@ -1426,25 +1361,23 @@ fun FormularioAuditoriaScreen(
                             }
                         }
                         
-                        if (isManualMode) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedTextField(
-                                value = manualDistance,
-                                onValueChange = { 
-                                    manualDistance = it
-                                    val dist = it.toFloatOrNull() ?: 0f
-                                    if (dist > 0 && calcTimeSec > 0) {
-                                        calcSpeed = (dist / calcTimeSec) * 3.6f
-                                        calcDistance = dist
-                                    }
-                                },
-                                label = { Text("Distancia Manual (metros)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                colors = blackTextFieldColors(),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = manualDistance,
+                            onValueChange = { 
+                                manualDistance = it
+                                val dist = it.toFloatOrNull() ?: 0f
+                                if (dist > 0 && calcTimeSec > 0) {
+                                    calcSpeed = (dist / calcTimeSec) * 3.6f
+                                    calcDistance = dist
+                                }
+                            },
+                            label = { Text("Distancia Manual (metros)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = blackTextFieldColors(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
                     }
                 }
 
@@ -1455,7 +1388,6 @@ fun FormularioAuditoriaScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(text = "Velocidad: ${String.format(Locale.US, "%.2f", calcSpeed)} km/h", color = Color.Black)
-                    Text(text = "Margen Error: ±${String.format(Locale.US, "%.1f", calcError)}m", color = Color.DarkGray)
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
@@ -1568,6 +1500,10 @@ fun FormularioAuditoriaScreen(
                                 formula = if (formula == "OTRO") manualFormulaName else formula,
                                 presion = presion,
                                 volumen = volumen,
+                                longitudBrazoIzquierdo = longitudBrazoIzquierdo,
+                                longitudBrazoDerecho = longitudBrazoDerecho,
+                                cantidadBoquillasIzquierdas = cantidadBoquillasIzquierdas,
+                                cantidadBoquillasDerechas = cantidadBoquillasDerechas,
                                 nozzlesIzquierdo = leftNozzles,
                                 nozzlesDerecho = rightNozzles,
                                 tiempoDesplazamientoSegundos = calcTimeSec,
@@ -1808,11 +1744,12 @@ object ExportManager {
             val headers = arrayOf(
                 "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", "Operador", 
                 "CodTractor", "CodImplemento", "PotTractor", "PotTDF", "Formula", 
-                "Presion", "Volumen", "Velocidad GPS", "Distancia GPS",
+                "Presion", "Volumen", "Velocidad km/h", "Distancia m", "Tiempo s",
+                "LongBrazoIzq", "LongBrazoDer", "CantBoqIzq", "CantBoqDer",
                 "BoquillasTapadas", "NumTapadas", "PresenciaPersonal", "AlturaUniforme", 
                 "EstadoVia", "PapelHidro", "Gotas1cm2", "Gotas1/4cm2",
-                "B1_ID", "B1_Pres", "B1_Vol", "B2_ID", "B2_Pres", "B2_Vol",
-                "B3_ID", "B3_Pres", "B3_Vol", "B4_ID", "B4_Pres", "B4_Vol"
+                "B1_ID", "B1_Pres", "B1_Vol", "B1_Tiempo", "B2_ID", "B2_Pres", "B2_Vol", "B2_Tiempo",
+                "B3_ID", "B3_Pres", "B3_Vol", "B3_Tiempo", "B4_ID", "B4_Pres", "B4_Vol", "B4_Tiempo"
             )
             
             val mezclasHeaders = arrayOf(
@@ -1882,24 +1819,30 @@ object ExportManager {
                 row.createCell(13).setCellValue(audit.volumen)
                 row.createCell(14).setCellValue(audit.velocidadKmh.toString())
                 row.createCell(15).setCellValue(audit.distanciaMetros.toString())
+                row.createCell(16).setCellValue(audit.tiempoDesplazamientoSegundos.toString())
+                row.createCell(17).setCellValue(audit.longitudBrazoIzquierdo)
+                row.createCell(18).setCellValue(audit.longitudBrazoDerecho)
+                row.createCell(19).setCellValue(audit.cantidadBoquillasIzquierdas)
+                row.createCell(20).setCellValue(audit.cantidadBoquillasDerechas)
                 
-                row.createCell(16).setCellValue(if (audit.boquillasTapadas == true) "SI" else if (audit.boquillasTapadas == false) "NO" else "")
-                row.createCell(17).setCellValue(audit.boquillasTapadasNum)
-                row.createCell(18).setCellValue(if (audit.presenciaPersonal == true) "SI" else if (audit.presenciaPersonal == false) "NO" else "")
-                row.createCell(19).setCellValue(if (audit.alturaUniforme == true) "SI" else if (audit.alturaUniforme == false) "NO" else "")
-                row.createCell(20).setCellValue(audit.estadoVia)
-                row.createCell(21).setCellValue(if (audit.papelHidrosensible) "SI" else "NO")
-                row.createCell(22).setCellValue(audit.papelGotas1cm)
-                row.createCell(23).setCellValue(audit.papelGotasCuarto)
+                row.createCell(21).setCellValue(if (audit.boquillasTapadas == true) "SI" else if (audit.boquillasTapadas == false) "NO" else "")
+                row.createCell(22).setCellValue(audit.boquillasTapadasNum)
+                row.createCell(23).setCellValue(if (audit.presenciaPersonal == true) "SI" else if (audit.presenciaPersonal == false) "NO" else "")
+                row.createCell(24).setCellValue(if (audit.alturaUniforme == true) "SI" else if (audit.alturaUniforme == false) "NO" else "")
+                row.createCell(25).setCellValue(audit.estadoVia)
+                row.createCell(26).setCellValue(if (audit.papelHidrosensible) "SI" else "NO")
+                row.createCell(27).setCellValue(audit.papelGotas1cm)
+                row.createCell(28).setCellValue(audit.papelGotasCuarto)
                 
                 // --- Nozzles Serialized ---
                 val allNozzles = audit.nozzlesIzquierdo + audit.nozzlesDerecho
                 for (i in 0 until 4) {
                     if (i < allNozzles.size) {
                         val n = allNozzles[i]
-                        row.createCell(24 + (i * 3)).setCellValue(n.id.toDouble())
-                        row.createCell(25 + (i * 3)).setCellValue(n.presion)
-                        row.createCell(26 + (i * 3)).setCellValue(n.volumen)
+                        row.createCell(29 + (i * 4)).setCellValue(n.id.toDouble())
+                        row.createCell(30 + (i * 4)).setCellValue(n.presion)
+                        row.createCell(31 + (i * 4)).setCellValue(n.volumen)
+                        row.createCell(32 + (i * 4)).setCellValue(n.tiempoSegundos.toString())
                     }
                 }
                 }
@@ -2435,3 +2378,59 @@ fun FormularioMezclasScreen(
     }
 }
 
+@Composable
+fun BoquillaItem(nozzle: NozzleData, onUpdate: (NozzleData) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(text = "Boquilla #${nozzle.id}", fontWeight = FontWeight.Bold, color = Color.Black)
+            
+            var isRunning by remember { mutableStateOf(false) }
+            var startTime by remember { mutableStateOf(0L) }
+            var acumTime by remember { mutableStateOf(nozzle.tiempoSegundos) }
+            var displayTime by remember { mutableStateOf(nozzle.tiempoSegundos) }
+
+            LaunchedEffect(isRunning) {
+                while (isRunning) {
+                    kotlinx.coroutines.delay(100L)
+                    val current = ((System.currentTimeMillis() - startTime) / 1000).toInt()
+                    displayTime = acumTime + current
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Tiempo cronometrado: ${displayTime} s", fontWeight = FontWeight.Medium, color = Color.Black)
+                Button(
+                    onClick = {
+                        if (isRunning) {
+                            isRunning = false
+                            acumTime = displayTime
+                            onUpdate(nozzle.copy(tiempoSegundos = acumTime))
+                        } else {
+                            startTime = System.currentTimeMillis()
+                            isRunning = true
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isRunning) Color(0xFFE53935) else Color(0xFF4CAF50))
+                ) {
+                    Text(if (isRunning) "Detener" else "Iniciar")
+                }
+            }
+
+            OutlinedTextField(
+                value = nozzle.volumen,
+                onValueChange = { onUpdate(nozzle.copy(volumen = it)) },
+                label = { Text("Volumen (ml)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+            )
+            OutlinedTextField(
+                value = nozzle.presion,
+                onValueChange = { onUpdate(nozzle.copy(presion = it)) },
+                label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+            )
+        }
+    }
+}
