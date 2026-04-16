@@ -164,7 +164,7 @@ data class AuditoriaInfo(
     var estadoVia: String = "", // "BUENO", "REGULAR", "MALO"
     var papelHidrosensible: Boolean = false,
     var papelGotas1cm: String = "",
-    var papelGotasCuarto: String = ""
+    var tamanoGotas: String = ""
 ) : Serializable
 
 @Composable
@@ -873,11 +873,20 @@ fun FormularioAuditoriaScreen(
     // --- Lógica Medición Manual ---
     var isMeasuring by rememberSaveable { mutableStateOf(false) }
     var startTime by rememberSaveable { mutableStateOf(0L) }
-    
     var calcDistance by rememberSaveable { mutableStateOf(info.distanciaMetros) }
     var calcTimeSec by rememberSaveable { mutableStateOf(info.tiempoDesplazamientoSegundos) }
     var calcSpeed by rememberSaveable { mutableStateOf(info.velocidadKmh) }
     var manualDistance by rememberSaveable { mutableStateOf(if (info.distanciaMetros > 0f) info.distanciaMetros.toString() else "") }
+    var displayVelocityTime by remember { mutableStateOf(info.tiempoDesplazamientoSegundos.toInt()) }
+
+    LaunchedEffect(isMeasuring) {
+        if (isMeasuring) {
+            while (isMeasuring) {
+                kotlinx.coroutines.delay(100L)
+                displayVelocityTime = ((System.currentTimeMillis() - startTime) / 1000).toInt()
+            }
+        }
+    }
 
     // --- Final Cuestionario ---
     var boquillasTapadas by rememberSaveable { mutableStateOf(info.boquillasTapadas) }
@@ -889,7 +898,10 @@ fun FormularioAuditoriaScreen(
     
     var papelHidro by rememberSaveable { mutableStateOf(info.papelHidrosensible) }
     var papelGotas1cm by rememberSaveable { mutableStateOf(info.papelGotas1cm) }
-    var papelGotasCuarto by rememberSaveable { mutableStateOf(info.papelGotasCuarto) }
+    var tamanoGotas by rememberSaveable { mutableStateOf(info.tamanoGotas) }
+
+    var showRecommendationDialog by remember { mutableStateOf(false) }
+    var recommendationMessage by remember { mutableStateOf("") }
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
@@ -1348,6 +1360,7 @@ fun FormularioAuditoriaScreen(
                                 onClick = {
                                     val eTime = System.currentTimeMillis()
                                     calcTimeSec = (eTime - startTime) / 1000
+                                    displayVelocityTime = calcTimeSec.toInt()
                                     isMeasuring = false
                                     
                                     val dist = manualDistance.toFloatOrNull() ?: 0f
@@ -1383,7 +1396,7 @@ fun FormularioAuditoriaScreen(
 
                 // Resultados
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "Tiempo: ${calcTimeSec}s", color = Color.Black)
+                    Text(text = "Tiempo: ${displayVelocityTime}s", color = Color.Black)
                     Text(text = "Distancia: ${String.format(Locale.US, "%.2f", calcDistance)}m", color = Color.Black)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1471,11 +1484,10 @@ fun FormularioAuditoriaScreen(
                         shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                     )
                     OutlinedTextField(
-                        value = papelGotasCuarto,
-                        onValueChange = { papelGotasCuarto = it },
-                        label = { Text("Gotas (1/4 cm²)") },
+                        value = tamanoGotas,
+                        onValueChange = { tamanoGotas = it },
+                        label = { Text("Tamaño de gotas") },
                         modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
                     )
                 }
@@ -1485,41 +1497,123 @@ fun FormularioAuditoriaScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+                if (showRecommendationDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showRecommendationDialog = false },
+                        title = { Text("Recomendaciones de Auditoría", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                Text(recommendationMessage)
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { 
+                                showRecommendationDialog = false
+                                // Una vez visto, procedemos a realizar el onContinue para volver al menú
+                                val updatedInfo = info.copy(
+                                    operador = operador,
+                                    codTractor = codTractor,
+                                    codImplemento = codImplemento,
+                                    potenciaTractor = potenciaTractor,
+                                    potenciaTdf = potenciaTdf,
+                                    formula = if (formula == "OTRO") manualFormulaName else formula,
+                                    presion = presion,
+                                    volumen = volumen,
+                                    longitudBrazoIzquierdo = longitudBrazoIzquierdo,
+                                    longitudBrazoDerecho = longitudBrazoDerecho,
+                                    cantidadBoquillasIzquierdas = cantidadBoquillasIzquierdas,
+                                    cantidadBoquillasDerechas = cantidadBoquillasDerechas,
+                                    nozzlesIzquierdo = leftNozzles,
+                                    nozzlesDerecho = rightNozzles,
+                                    tiempoDesplazamientoSegundos = calcTimeSec,
+                                    distanciaMetros = calcDistance,
+                                    velocidadKmh = calcSpeed,
+                                    boquillasTapadas = boquillasTapadas,
+                                    boquillasTapadasNum = boquillasTapadasNum,
+                                    presenciaPersonal = presenciaPersonal,
+                                    alturaUniforme = alturaUniforme,
+                                    estadoVia = estadoVia,
+                                    papelHidrosensible = papelHidro,
+                                    papelGotas1cm = papelGotas1cm,
+                                    tamanoGotas = tamanoGotas
+                                )
+                                onContinue(updatedInfo)
+                            }) {
+                                Text("Aceptar")
+                            }
+                        }
+                    )
+                }
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)) {
                         Text("Volver")
                     }
                     Button(
                         onClick = {
-                            val updatedInfo = info.copy(
-                                operador = operador,
-                                codTractor = codTractor,
-                                codImplemento = codImplemento,
-                                potenciaTractor = potenciaTractor,
-                                potenciaTdf = potenciaTdf,
-                                formula = if (formula == "OTRO") manualFormulaName else formula,
-                                presion = presion,
-                                volumen = volumen,
-                                longitudBrazoIzquierdo = longitudBrazoIzquierdo,
-                                longitudBrazoDerecho = longitudBrazoDerecho,
-                                cantidadBoquillasIzquierdas = cantidadBoquillasIzquierdas,
-                                cantidadBoquillasDerechas = cantidadBoquillasDerechas,
-                                nozzlesIzquierdo = leftNozzles,
-                                nozzlesDerecho = rightNozzles,
-                                tiempoDesplazamientoSegundos = calcTimeSec,
-                                distanciaMetros = calcDistance,
-                                velocidadKmh = calcSpeed,
+                            // --- Lógica de Recomendaciones ---
+                            val sb = StringBuilder()
+                            
+                            // 1. Alerta de Presión
+                            val highPressureNozzles = (leftNozzles + rightNozzles).filter { (it.presion.toFloatOrNull() ?: 0f) > 20f || (it.presion.toFloatOrNull() ?: 100f) < 15f }
+                            if (highPressureNozzles.isNotEmpty()) {
+                                sb.append("⚠️ ALERTA DE PRESIÓN:\n")
+                                highPressureNozzles.forEach { n ->
+                                    sb.append("- Boquilla #${n.id}: ${n.presion} PSI (Fuera de rango 15-20 PSI)\n")
+                                }
+                                sb.append("\n")
+                            }
+
+                            // 2. Cálculo de L/Ha
+                            val nTotal = (cantidadBoquillasIzquierdas.toIntOrNull() ?: 0) + (cantidadBoquillasDerechas.toIntOrNull() ?: 0)
+                            val dist = calcDistance
+                            val vTime = calcTimeSec
+                            
+                            if (nTotal > 0 && dist > 0 && vTime > 0) {
+                                val allEvaluated = leftNozzles + rightNozzles
+                                val lhaResults = mutableListOf<Float>()
                                 
-                                boquillasTapadas = boquillasTapadas,
-                                boquillasTapadasNum = boquillasTapadasNum,
-                                presenciaPersonal = presenciaPersonal,
-                                alturaUniforme = alturaUniforme,
-                                estadoVia = estadoVia,
-                                papelHidrosensible = papelHidro,
-                                papelGotas1cm = papelGotas1cm,
-                                papelGotasCuarto = papelGotasCuarto
-                            )
-                            onContinue(updatedInfo)
+                                allEvaluated.forEach { nozzle ->
+                                    val nTime = nozzle.tiempoSegundos.toFloat()
+                                    val nVol = nozzle.volumen.toFloatOrNull() ?: 0f
+                                    
+                                    if (nTime > 0) {
+                                        val flowMLs = nVol / nTime
+                                        val totalVolTripL = (flowMLs * vTime) / 1000f
+                                        
+                                        // Determinar longitud del brazo
+                                        val isLeft = leftNozzles.any { it.id == nozzle.id }
+                                        val armLen = (if (isLeft) longitudBrazoIzquierdo else longitudBrazoDerecho).toFloatOrNull() ?: 0f
+                                        
+                                        if (armLen > 0) {
+                                            val areaHa = (armLen * dist) / 10000f
+                                            if (areaHa > 0) {
+                                                val lhaIndividual = (totalVolTripL / areaHa) * nTotal
+                                                lhaResults.add(lhaIndividual)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                if (lhaResults.isNotEmpty()) {
+                                    val avgLHa = lhaResults.average().toFloat()
+                                    sb.append("📊 RESULTADO DE CAUDAL:\n")
+                                    sb.append("- Promedio calculado: ${String.format(Locale.US, "%.2f", avgLHa)} L/Ha\n")
+                                    if (avgLHa < 2000f) {
+                                        sb.append("❌ ALERTA: El caudal es menor a 2000 L/Ha. Se recomienda revisar calibración.\n")
+                                    } else {
+                                        sb.append("✅ El caudal es igual o mayor a 2000 L/Ha.\n")
+                                    }
+                                } else {
+                                    sb.append("ℹ️ No se pudo calcular L/Ha. Verifique longitudes de brazo y volumen de boquillas.\n")
+                                }
+                            } else {
+                                sb.append("ℹ️ Faltan datos (distancia, tiempo o cantidad boquillas) para el cálculo de L/Ha.\n")
+                            }
+
+                            if (sb.isEmpty()) sb.append("Auditoría guardada exitosamente.")
+                            recommendationMessage = sb.toString()
+                            showRecommendationDialog = true
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
@@ -1747,7 +1841,7 @@ object ExportManager {
                 "Presion", "Volumen", "Velocidad km/h", "Distancia m", "Tiempo s",
                 "LongBrazoIzq", "LongBrazoDer", "CantBoqIzq", "CantBoqDer",
                 "BoquillasTapadas", "NumTapadas", "PresenciaPersonal", "AlturaUniforme", 
-                "EstadoVia", "PapelHidro", "Gotas1cm2", "Gotas1/4cm2",
+                "EstadoVia", "PapelHidro", "Gotas 1cm2", "Tamaño Gotas",
                 "B1_ID", "B1_Pres", "B1_Vol", "B1_Tiempo", "B2_ID", "B2_Pres", "B2_Vol", "B2_Tiempo",
                 "B3_ID", "B3_Pres", "B3_Vol", "B3_Tiempo", "B4_ID", "B4_Pres", "B4_Vol", "B4_Tiempo"
             )
@@ -1832,7 +1926,7 @@ object ExportManager {
                 row.createCell(25).setCellValue(audit.estadoVia)
                 row.createCell(26).setCellValue(if (audit.papelHidrosensible) "SI" else "NO")
                 row.createCell(27).setCellValue(audit.papelGotas1cm)
-                row.createCell(28).setCellValue(audit.papelGotasCuarto)
+                row.createCell(28).setCellValue(audit.tamanoGotas)
                 
                 // --- Nozzles Serialized ---
                 val allNozzles = audit.nozzlesIzquierdo + audit.nozzlesDerecho
