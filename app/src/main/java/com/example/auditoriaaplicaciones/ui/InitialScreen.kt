@@ -168,6 +168,7 @@ data class AuditoriaInfo(
     var papelGotas1cm: String = "",
     var tamanoGotas: String = "",
     var ubicacion: String = "",
+    var observaciones: String = "",
     var velocidadOptima: Float = 0f,
     var isSynced: Boolean = false
 ) : Serializable
@@ -906,6 +907,7 @@ fun FormularioAuditoriaScreen(
     var papelHidro by rememberSaveable { mutableStateOf(info.papelHidrosensible) }
     var papelGotas1cm by rememberSaveable { mutableStateOf(info.papelGotas1cm) }
     var tamanoGotas by rememberSaveable { mutableStateOf(info.tamanoGotas) }
+    var observaciones by rememberSaveable { mutableStateOf(info.observaciones) }
 
     var showRecommendationDialog by remember { mutableStateOf(false) }
     var recommendationMessage by remember { mutableStateOf("") }
@@ -1554,6 +1556,15 @@ fun FormularioAuditoriaScreen(
                     )
                 }
 
+                OutlinedTextField(
+                    value = observaciones,
+                    onValueChange = { observaciones = it },
+                    label = { Text("Observaciones") },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    colors = blackTextFieldColors(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)) {
                         Text("Volver")
@@ -1652,6 +1663,7 @@ fun FormularioAuditoriaScreen(
                             
                             // Guardamos temporalmente en el objeto info que recibimos
                             info.velocidadOptima = finalVelOptima
+                            info.observaciones = observaciones
                             // La ubicación se captura asíncronamente en capturedLocation y será usada en el confirmButton
                             
                             showRecommendationDialog = true
@@ -1930,7 +1942,7 @@ object ExportManager {
                 "EstadoVia", "PapelHidro", "Gotas 1cm2", "Tamaño Gotas",
                 "B1_ID", "B1_Pres", "B1_Vol", "B1_Tiempo", "B2_ID", "B2_Pres", "B2_Vol", "B2_Tiempo",
                 "B3_ID", "B3_Pres", "B3_Vol", "B3_Tiempo", "B4_ID", "B4_Pres", "B4_Vol", "B4_Tiempo",
-                "Ubicacion", "Vel_Optima", "Sincronizado"
+                "Ubicacion", "Vel_Optima", "Sincronizado", "Observaciones"
             )
             
             val mezclasHeaders = arrayOf(
@@ -1939,7 +1951,7 @@ object ExportManager {
                 "pH Final", "CE Final mS/cm",
                 "Mezclador", "Formula",
                 "Productos Evaluados (JSON)", "Incompatibilidad", "Respeta Orden", "Obs Orden",
-                "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque"
+                "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque", "Observaciones"
             )
 
             // Setup Spray Boom Sheet
@@ -1981,6 +1993,7 @@ object ExportManager {
                     row.createCell(18).setCellValue(audit.obsEpp)
                     row.createCell(19).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
                     row.createCell(20).setCellValue(audit.obsTanqueLimpio)
+                    row.createCell(21).setCellValue(audit.observaciones)
                 } else {
                     val row = sbSheet.createRow(sbRowIdx++)
                 
@@ -2029,6 +2042,7 @@ object ExportManager {
                 row.createCell(45).setCellValue(audit.ubicacion)
                 row.createCell(46).setCellValue(audit.velocidadOptima.toDouble())
                 row.createCell(47).setCellValue(if (audit.isSynced) "SI" else "NO")
+                row.createCell(48).setCellValue(audit.observaciones)
                 }
             }
 
@@ -2099,6 +2113,7 @@ fun FormularioMezclasScreen(
     
     var phFinal by rememberSaveable { mutableStateOf(info.phFinal) }
     var ceFinal by rememberSaveable { mutableStateOf(info.ceFinal) }
+    var observaciones by rememberSaveable { mutableStateOf(info.observaciones) }
 
     LaunchedEffect(selectedInsumos) {
         if (productosEvaluados.isEmpty() || selectedInsumos.map { it.insumo } != productosEvaluados.map { it.producto }) {
@@ -2528,6 +2543,15 @@ fun FormularioMezclasScreen(
                     }
                 }
 
+                OutlinedTextField(
+                    value = observaciones,
+                    onValueChange = { observaciones = it },
+                    label = { Text("Observaciones") },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = blackTextFieldColors(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
                 // Footers: Volver y Guardar
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)) {
@@ -2547,7 +2571,8 @@ fun FormularioMezclasScreen(
                                 tanqueLimpio = tanqueLimpio,
                                 obsTanqueLimpio = obsTanqueLimpio,
                                 phFinal = phFinal,
-                                ceFinal = ceFinal
+                                ceFinal = ceFinal,
+                                observaciones = observaciones
                             )
                             onContinue(updatedInfo)
                         },

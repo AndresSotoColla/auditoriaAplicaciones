@@ -60,6 +60,7 @@ object SyncManager {
         jsonMap["altura_uniforme"] = audit.alturaUniforme ?: false
         jsonMap["papel_hidrosensible"] = audit.papelHidrosensible
         jsonMap["velocidad_optima"] = audit.velocidadOptima
+        jsonMap["observaciones"] = audit.observaciones
 
         // Nozzles (B1, B2 from Left; B3, B4 from Right)
         val left = audit.nozzlesIzquierdo
