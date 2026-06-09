@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -75,6 +76,13 @@ data class ProductoEvaluado(
     var cantidad: String = "",
     var unidad: String = "",
     var orden: String = ""
+) : Serializable
+
+data class CalculoRecorrido(
+    val id: String = UUID.randomUUID().toString(),
+    var distancia: Double = 0.0,
+    var tiempo: Double = 0.0,
+    var volumenAplicado: Double = 0.0
 ) : Serializable
 
 data class InsumoData(
@@ -170,7 +178,19 @@ data class AuditoriaInfo(
     var ubicacion: String = "",
     var observaciones: String = "",
     var velocidadOptima: Float = 0f,
-    var isSynced: Boolean = false
+    var isSynced: Boolean = false,
+
+    // Calibración Spray Boom
+    var operarioCalib: String = "",
+    var tractorCalib: String = "",
+    var volumenTanque: Double = 0.0,
+    var implementoCalib: String = "",
+    var numBoquillas: Int = 0,
+    var tipoBoquillas: String = "",
+    var referenciaBoquillas: String = "",
+    var tiempoCalib: Double = 0.0,
+    var descargaCalib: Double = 0.0,
+    var calculosRecorrido: List<CalculoRecorrido> = emptyList()
 ) : Serializable
 
 @Composable
@@ -260,6 +280,8 @@ fun InitialScreen(
                                     currentScreen = "SprayBoom"
                                 } else if (option == "Mezclas") {
                                     currentScreen = "DatosGenerales"
+                                } else if (option == "Calibracion Spray Boom") {
+                                    currentScreen = "DatosGenerales"
                                 }
                             }
                         )
@@ -281,12 +303,14 @@ fun InitialScreen(
                 "DatosGenerales" -> {
                     BackHandler {
                         if (auditoriaInfo.tipoAuditoria == "Mezclas") currentScreen = "Menu"
+                        else if (auditoriaInfo.tipoAuditoria == "Calibracion Spray Boom") currentScreen = "Menu"
                         else currentScreen = "SprayBoom"
                     }
                     DatosGeneralesScreen(
                         infoInicial = auditoriaInfo,
                         onBack = { 
                             if (auditoriaInfo.tipoAuditoria == "Mezclas") currentScreen = "Menu"
+                            else if (auditoriaInfo.tipoAuditoria == "Calibracion Spray Boom") currentScreen = "Menu"
                             else currentScreen = "SprayBoom"
                         },
                         onContinue = { info ->
@@ -294,6 +318,8 @@ fun InitialScreen(
                             auditoriaInfo = info
                             if (info.tipoAuditoria == "Mezclas") {
                                 currentScreen = "FormularioMezclas"
+                            } else if (info.tipoAuditoria == "Calibracion Spray Boom") {
+                                currentScreen = "FormularioCalibracion"
                             } else {
                                 currentScreen = "FormularioAuditoria"
                             }
@@ -322,6 +348,19 @@ fun InitialScreen(
                             auditoriaInfo = finalInfo
                             StorageManager.saveAuditoria(context, finalInfo)
                             Toast.makeText(context, "¡Auditoría de Mezclas Guardada!", Toast.LENGTH_LONG).show()
+                            currentScreen = "Menu"
+                        }
+                    )
+                }
+                "FormularioCalibracion" -> {
+                    BackHandler { currentScreen = "DatosGenerales" }
+                    FormularioCalibracionScreen(
+                        info = auditoriaInfo,
+                        onBack = { currentScreen = "DatosGenerales" },
+                        onContinue = { finalInfo ->
+                            auditoriaInfo = finalInfo
+                            StorageManager.saveAuditoria(context, finalInfo)
+                            Toast.makeText(context, "¡Calibración Guardada!", Toast.LENGTH_LONG).show()
                             currentScreen = "Menu"
                         }
                     )
@@ -471,6 +510,22 @@ fun SelectionDialog(
                 ) {
                     Text(
                         "AUDITORÍA SPRAY BOOM",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Button(
+                    onClick = { onOptionSelected("Calibracion Spray Boom") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = beigeClaro,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "CALIBRACIÓN SPRAY BOOM",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1846,7 +1901,10 @@ fun HistorialScreen(onBack: () -> Unit) {
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     FilterChip(
                         selected = filterMode == "TODOS",
                         onClick = { filterMode = "TODOS" },
@@ -1861,6 +1919,11 @@ fun HistorialScreen(onBack: () -> Unit) {
                         selected = filterMode == "Mezclas",
                         onClick = { filterMode = "Mezclas" },
                         label = { Text("Mezclas", color = Color.Black) }
+                    )
+                    FilterChip(
+                        selected = filterMode == "Calibracion Spray Boom",
+                        onClick = { filterMode = "Calibracion Spray Boom" },
+                        label = { Text("Calibración", color = Color.Black) }
                     )
                 }
 
@@ -1886,6 +1949,14 @@ fun HistorialScreen(onBack: () -> Unit) {
                                         Text(text = "Evaluador: ${audit.evaluador}", fontSize = 14.sp, color = Color.DarkGray)
                                         if (audit.isSynced) {
                                             Text(text = "✓ Sincronizado", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    if (audit.tipoAuditoria == "Calibracion Spray Boom") {
+                                        IconButton(onClick = {
+                                            PdfExportManager.exportToPdf(context, audit)
+                                        }) {
+                                            Icon(Icons.Default.PictureAsPdf, contentDescription = "Descargar PDF", tint = Color.Black)
                                         }
                                     }
 
@@ -1932,6 +2003,7 @@ object ExportManager {
             // Sheet 1: Spray Boom
             val sbSheet = workbook.createSheet("Spray Boom")
             val mezclasSheet = workbook.createSheet("Mezclas")
+            val calibSheet = workbook.createSheet("Calibración Spray Boom")
 
             val headers = arrayOf(
                 "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", "Operador", 
@@ -1954,6 +2026,15 @@ object ExportManager {
                 "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque", "Observaciones"
             )
 
+            val calibHeaders = arrayOf(
+                "ID", "Fecha", "Hora", "Evaluador", "Finca", "Lote", "Operario", 
+                "CodTractor", "VolumenTanque", "CodImplemento", "NumBoquillas", 
+                "TipoBoquillas", "ReferenciaBoquillas", "TiempoDescarga", "Descarga", 
+                "CaudalBoquilla", "CaudalTotal", "PromedioDistancia", "PromedioTiempo", 
+                "PromedioVelocidadKmh", "AreaRecorridaHa", "AreaTotalTanqueHa", 
+                "VelocidadRequeridaKmh", "Observaciones", "CalculosRecorrido (JSON)"
+            )
+
             // Setup Spray Boom Sheet
             var row0 = sbSheet.createRow(0)
             headers.forEachIndexed { i, h -> row0.createCell(i).setCellValue(h) }
@@ -1962,8 +2043,13 @@ object ExportManager {
             var mRow0 = mezclasSheet.createRow(0)
             mezclasHeaders.forEachIndexed { i, h -> mRow0.createCell(i).setCellValue(h) }
 
+            // Setup Calibración Sheet
+            var calRow0 = calibSheet.createRow(0)
+            calibHeaders.forEachIndexed { i, h -> calRow0.createCell(i).setCellValue(h) }
+
             var sbRowIdx = 1
             var mRowIdx = 1
+            var calRowIdx = 1
 
             for (audit in audits) {
                 val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(audit.fecha))
@@ -1994,6 +2080,51 @@ object ExportManager {
                     row.createCell(19).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
                     row.createCell(20).setCellValue(audit.obsTanqueLimpio)
                     row.createCell(21).setCellValue(audit.observaciones)
+                } else if (audit.tipoAuditoria == "Calibracion Spray Boom") {
+                    val row = calibSheet.createRow(calRowIdx++)
+                    row.createCell(0).setCellValue(audit.id)
+                    row.createCell(1).setCellValue(dateStr)
+                    row.createCell(2).setCellValue(audit.hora)
+                    row.createCell(3).setCellValue(audit.evaluador)
+                    row.createCell(4).setCellValue(audit.finca)
+                    row.createCell(5).setCellValue(audit.lote)
+                    row.createCell(6).setCellValue(audit.operarioCalib)
+                    row.createCell(7).setCellValue(audit.tractorCalib)
+                    row.createCell(8).setCellValue(audit.volumenTanque)
+                    row.createCell(9).setCellValue(audit.implementoCalib)
+                    row.createCell(10).setCellValue(audit.numBoquillas.toDouble())
+                    row.createCell(11).setCellValue(audit.tipoBoquillas)
+                    row.createCell(12).setCellValue(audit.referenciaBoquillas)
+                    row.createCell(13).setCellValue(audit.tiempoCalib)
+                    row.createCell(14).setCellValue(audit.descargaCalib)
+                    
+                    val q = if (audit.tiempoCalib > 0.0) (audit.descargaCalib / audit.tiempoCalib) * 0.06 else 0.0
+                    val qTot = audit.numBoquillas * q
+                    row.createCell(15).setCellValue(q)
+                    row.createCell(16).setCellValue(qTot)
+                    
+                    val validRuns = audit.calculosRecorrido.filter { it.distancia > 0.0 && it.tiempo > 0.0 }
+                    val avgDist = if (validRuns.isNotEmpty()) validRuns.map { it.distancia }.average() else 0.0
+                    val avgTime = if (validRuns.isNotEmpty()) validRuns.map { it.tiempo }.average() else 0.0
+                    val avgVol = if (validRuns.isNotEmpty()) validRuns.map { it.volumenAplicado }.average() else 0.0
+                    val avgVelKmh = if (avgTime > 0.0) (avgDist / avgTime) * 3.6 else 0.0
+                    
+                    val w = audit.numBoquillas * 0.5
+                    val areaRecHa = (w * avgDist) / 10000.0
+                    val dosReal = if (areaRecHa > 0.0) avgVol / areaRecHa else 0.0
+                    val areaTotTanq = if (dosReal > 0.0) audit.volumenTanque / dosReal else 0.0
+                    val velReq = q * 0.6
+                    
+                    row.createCell(17).setCellValue(avgDist)
+                    row.createCell(18).setCellValue(avgTime)
+                    row.createCell(19).setCellValue(avgVelKmh)
+                    row.createCell(20).setCellValue(areaRecHa)
+                    row.createCell(21).setCellValue(areaTotTanq)
+                    row.createCell(22).setCellValue(velReq)
+                    row.createCell(23).setCellValue(audit.observaciones)
+                    
+                    val jsonRecorridos = com.google.gson.Gson().toJson(audit.calculosRecorrido)
+                    row.createCell(24).setCellValue(jsonRecorridos)
                 } else {
                     val row = sbSheet.createRow(sbRowIdx++)
                 
@@ -2640,6 +2771,808 @@ fun BoquillaItem(nozzle: NozzleData, onUpdate: (NozzleData) -> Unit) {
                 onValueChange = { onUpdate(nozzle.copy(presion = it)) },
                 label = { Text("Presión (PSI)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
             )
+        }
+    }
+}
+
+@Composable
+fun CalculoRecorridoCard(
+    index: Int,
+    calculo: CalculoRecorrido,
+    onUpdate: (CalculoRecorrido) -> Unit,
+    onDelete: () -> Unit
+) {
+    var distStr by rememberSaveable(calculo.id) { mutableStateOf(if (calculo.distancia > 0.0) calculo.distancia.toString() else "") }
+    var tiempoStr by rememberSaveable(calculo.id) { mutableStateOf(if (calculo.tiempo > 0.0) calculo.tiempo.toString() else "") }
+    var volStr by rememberSaveable(calculo.id) { mutableStateOf(if (calculo.volumenAplicado > 0.0) calculo.volumenAplicado.toString() else "") }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Cálculo #${index + 1}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.Black
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar cálculo", tint = Color.Red)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = distStr,
+                onValueChange = {
+                    distStr = it
+                    val dVal = it.toDoubleOrNull() ?: 0.0
+                    onUpdate(calculo.copy(distancia = dVal))
+                },
+                label = { Text("Distancia recorrida (metros)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(12.dp),
+                colors = blackTextFieldColors()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = tiempoStr,
+                onValueChange = {
+                    tiempoStr = it
+                    val tVal = it.toDoubleOrNull() ?: 0.0
+                    onUpdate(calculo.copy(tiempo = tVal))
+                },
+                label = { Text("Tiempo recorrido (segundos)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(12.dp),
+                colors = blackTextFieldColors()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = volStr,
+                onValueChange = {
+                    volStr = it
+                    val vVal = it.toDoubleOrNull() ?: 0.0
+                    onUpdate(calculo.copy(volumenAplicado = vVal))
+                },
+                label = { Text("Volumen aplicado (litros)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(12.dp),
+                colors = blackTextFieldColors()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FormularioCalibracionScreen(
+    info: AuditoriaInfo,
+    onBack: () -> Unit,
+    onContinue: (AuditoriaInfo) -> Unit
+) {
+    var operario by rememberSaveable { mutableStateOf(info.operarioCalib) }
+    var codTractor by rememberSaveable { mutableStateOf(info.tractorCalib) }
+    var volumenTanqueStr by rememberSaveable { mutableStateOf(if (info.volumenTanque > 0.0) info.volumenTanque.toString() else "") }
+    var codImplemento by rememberSaveable { mutableStateOf(info.implementoCalib) }
+    var numBoquillasStr by rememberSaveable { mutableStateOf(if (info.numBoquillas > 0) info.numBoquillas.toString() else "") }
+    var tipoBoquillas by rememberSaveable { mutableStateOf(info.tipoBoquillas) }
+    var referenciaBoquillas by rememberSaveable { mutableStateOf(info.referenciaBoquillas) }
+    var tiempoStr by rememberSaveable { mutableStateOf(if (info.tiempoCalib > 0.0) info.tiempoCalib.toString() else "") }
+    var descargaStr by rememberSaveable { mutableStateOf(if (info.descargaCalib > 0.0) info.descargaCalib.toString() else "") }
+    var listRecorridos by remember { mutableStateOf(info.calculosRecorrido) }
+    var observaciones by rememberSaveable { mutableStateOf(info.observaciones) }
+
+    val context = LocalContext.current
+    val tractorList = remember { List(41) { "TA-${(it + 1).toString().padStart(2, '0')}" } }
+    val implementList = remember { List(81) { "IA-${(it + 1).toString().padStart(2, '0')}" } }
+    var expandedTractor by rememberSaveable { mutableStateOf(false) }
+    var expandedImplement by rememberSaveable { mutableStateOf(false) }
+
+    val numBoquillas = numBoquillasStr.toIntOrNull() ?: 0
+    val tiempoVal = tiempoStr.toDoubleOrNull() ?: 0.0
+    val descargaVal = descargaStr.toDoubleOrNull() ?: 0.0
+    val volTanqueVal = volumenTanqueStr.toDoubleOrNull() ?: 0.0
+
+    // Calculations
+    val caudalBoquilla = if (tiempoVal > 0.0) (descargaVal / tiempoVal) * 0.06 else 0.0 // L/min per nozzle
+    val caudalTotal = numBoquillas * caudalBoquilla // L/min total
+
+    // Travel run averages
+    val validRecorridos = listRecorridos.filter { it.distancia > 0.0 && it.tiempo > 0.0 }
+    val avgDistancia = if (validRecorridos.isNotEmpty()) validRecorridos.map { it.distancia }.average() else 0.0
+    val avgTiempo = if (validRecorridos.isNotEmpty()) validRecorridos.map { it.tiempo }.average() else 0.0
+    val avgVolumen = if (validRecorridos.isNotEmpty()) validRecorridos.map { it.volumenAplicado }.average() else 0.0
+
+    val avgVelocidad = if (avgTiempo > 0.0) avgDistancia / avgTiempo else 0.0 // m/s
+    val avgVelocidadKmh = avgVelocidad * 3.6
+
+    // Ancho de trabajo (m) = numBoquillas * 0.5
+    val anchoTrabajo = numBoquillas * 0.5
+    val areaRecorridaHa = (anchoTrabajo * avgDistancia) / 10000.0
+    val dosisRealLHa = if (areaRecorridaHa > 0.0) avgVolumen / areaRecorridaHa else 0.0
+    val areaTotalTanqueHa = if (dosisRealLHa > 0.0) volTanqueVal / dosisRealLHa else 0.0
+
+    // Velocidad requerida para 2000 L/Ha
+    val velRequeridaKmh = caudalBoquilla * 0.6
+
+    val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Card(
+            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5E1C8), contentColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Calibración Spray Boom",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
+                // Header Info Summary
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.5f),
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Información General",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "Evaluador: ${info.evaluador}", fontSize = 14.sp)
+                        Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
+                        Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
+                        Text(text = "Fecha: ${dateFormatter.format(Date(info.fecha))}", fontSize = 14.sp)
+                        Text(text = "Hora: ${info.hora}", fontSize = 14.sp)
+                    }
+                }
+
+                Text(
+                    text = "Formulario de Calibración",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                OutlinedTextField(
+                    value = operario,
+                    onValueChange = { operario = it },
+                    label = { Text("Operario") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                // Tractor selector
+                ExposedDropdownMenuBox(
+                    expanded = expandedTractor,
+                    onExpandedChange = { expandedTractor = !expandedTractor },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = codTractor,
+                        onValueChange = { 
+                            codTractor = it
+                            expandedTractor = true
+                        },
+                        label = { Text("Código de Tractor") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                    val filteredTractors = tractorList.filter { it.contains(codTractor, ignoreCase = true) }
+                    if (filteredTractors.isNotEmpty() && expandedTractor) {
+                        DropdownMenu(
+                            expanded = expandedTractor,
+                            onDismissRequest = { expandedTractor = false },
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                        ) {
+                            filteredTractors.forEach { cod ->
+                                DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        codTractor = cod
+                                        expandedTractor = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = volumenTanqueStr,
+                    onValueChange = { volumenTanqueStr = it },
+                    label = { Text("Volumen del tanque (Litros)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                // Implement selector
+                ExposedDropdownMenuBox(
+                    expanded = expandedImplement,
+                    onExpandedChange = { expandedImplement = !expandedImplement },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = codImplemento,
+                        onValueChange = { 
+                            codImplemento = it
+                            expandedImplement = true
+                        },
+                        label = { Text("Código de implemento") },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                    val filteredImplements = implementList.filter { it.contains(codImplemento, ignoreCase = true) }
+                    if (filteredImplements.isNotEmpty() && expandedImplement) {
+                        DropdownMenu(
+                            expanded = expandedImplement,
+                            onDismissRequest = { expandedImplement = false },
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                        ) {
+                            filteredImplements.forEach { cod ->
+                                DropdownMenuItem(
+                                    text = { Text(cod, color = Color.Black) },
+                                    onClick = {
+                                        codImplemento = cod
+                                        expandedImplement = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = numBoquillasStr,
+                    onValueChange = { numBoquillasStr = it },
+                    label = { Text("Número de boquillas") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                OutlinedTextField(
+                    value = tipoBoquillas,
+                    onValueChange = { tipoBoquillas = it },
+                    label = { Text("Tipo de boquillas") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                OutlinedTextField(
+                    value = referenciaBoquillas,
+                    onValueChange = { referenciaBoquillas = it },
+                    label = { Text("Referencia de boquillas") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                OutlinedTextField(
+                    value = tiempoStr,
+                    onValueChange = { tiempoStr = it },
+                    label = { Text("Tiempo de descarga (segundos)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                OutlinedTextField(
+                    value = descargaStr,
+                    onValueChange = { descargaStr = it },
+                    label = { Text("Descarga (cc)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                HorizontalDivider(color = Color.Black.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
+
+                Text(
+                    text = "Cálculos de Recorrido",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                // List of travel calculation cards
+                listRecorridos.forEachIndexed { idx, item ->
+                    CalculoRecorridoCard(
+                        index = idx,
+                        calculo = item,
+                        onUpdate = { updated ->
+                            listRecorridos = listRecorridos.toMutableList().apply { this[idx] = updated }
+                        },
+                        onDelete = {
+                            listRecorridos = listRecorridos.toMutableList().apply { removeAt(idx) }
+                        }
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        listRecorridos = listRecorridos + CalculoRecorrido()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar nuevo cálculo", modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Agregar nuevo cálculo", fontWeight = FontWeight.SemiBold)
+                }
+
+                // Averages Summary Card
+                if (validRecorridos.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Averages (Promedios)",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(text = "Distancia: ${String.format(Locale.US, "%.2f", avgDistancia)} m", color = Color.Black)
+                            Text(text = "Tiempo: ${String.format(Locale.US, "%.2f", avgTiempo)} s", color = Color.Black)
+                            Text(text = "Volumen Aplicado: ${String.format(Locale.US, "%.2f", avgVolumen)} L", color = Color.Black)
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Color.Black.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
+
+                // Calculated Results Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Resultados Calculados",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Caudal boquilla:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.3f", caudalBoquilla)} L/min", color = Color.Black)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Caudal total barra:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.3f", caudalTotal)} L/min", color = Color.Black)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Velocidad promedio:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.2f", avgVelocidad)} m/s", color = Color.Black)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Velocidad promedio km/h:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.2f", avgVelocidadKmh)} km/h", color = Color.Black)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Ancho trabajo (barra):", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.1f", anchoTrabajo)} m (boquillas * 0.5m)", color = Color.DarkGray, fontSize = 12.sp)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Área recorrida prom:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.4f", areaRecorridaHa)} Ha", color = Color.Black)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Dosis real prom:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.1f", dosisRealLHa)} L/Ha", color = Color.Black)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(text = "Área total tanque:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                            Text(text = "${String.format(Locale.US, "%.2f", areaTotalTanqueHa)} Ha", color = Color.Black)
+                        }
+                        
+                        HorizontalDivider(color = Color.Black.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Velocidad requerida para 2000 L/Ha:", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text(text = "${String.format(Locale.US, "%.2f", velRequeridaKmh)} km/h", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = observaciones,
+                    onValueChange = { observaciones = it },
+                    label = { Text("Observaciones") },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                    ) {
+                        Text("Volver")
+                    }
+                    Button(
+                        onClick = {
+                            val finalInfo = info.copy(
+                                operarioCalib = operario,
+                                tractorCalib = codTractor,
+                                volumenTanque = volTanqueVal,
+                                implementoCalib = codImplemento,
+                                numBoquillas = numBoquillas,
+                                tipoBoquillas = tipoBoquillas,
+                                referenciaBoquillas = referenciaBoquillas,
+                                tiempoCalib = tiempoVal,
+                                descargaCalib = descargaVal,
+                                calculosRecorrido = listRecorridos,
+                                observaciones = observaciones,
+                                
+                                // Re-use general fields
+                                operador = operario,
+                                codTractor = codTractor,
+                                codImplemento = codImplemento,
+                                volumen = volumenTanqueStr,
+                                velocidadKmh = avgVelocidadKmh.toFloat(),
+                                distanciaMetros = avgDistancia.toFloat(),
+                                tiempoDesplazamientoSegundos = avgTiempo.toLong(),
+                                velocidadOptima = velRequeridaKmh.toFloat()
+                            )
+                            onContinue(finalInfo)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                    ) {
+                        Text("Guardar")
+                    }
+                }
+            }
+        }
+    }
+}
+
+object PdfExportManager {
+    fun exportToPdf(context: android.content.Context, audit: AuditoriaInfo) {
+        try {
+            val pdfDocument = android.graphics.pdf.PdfDocument()
+            // A4 dimensions: 595 x 842 points
+            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+
+            val paintText = android.graphics.Paint()
+            val paintLine = android.graphics.Paint()
+            
+            val margin = 40f
+            var currentY = 50f
+
+            // 1. HEADER BANNER
+            paintLine.color = android.graphics.Color.rgb(0, 100, 80) // Dark green
+            paintLine.style = android.graphics.Paint.Style.FILL
+            canvas.drawRect(margin, currentY, 595f - margin, currentY + 60f, paintLine)
+
+            paintText.color = android.graphics.Color.WHITE
+            paintText.textSize = 18f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            paintText.textAlign = android.graphics.Paint.Align.CENTER
+            canvas.drawText("REPORTE DE CALIBRACIÓN - SPRAY BOOM", 595f / 2f, currentY + 36f, paintText)
+            
+            currentY += 80f
+
+            // 2. GENERAL INFORMATION SECTION
+            paintText.color = android.graphics.Color.rgb(0, 100, 80)
+            paintText.textSize = 14f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            paintText.textAlign = android.graphics.Paint.Align.LEFT
+            canvas.drawText("INFORMACIÓN GENERAL", margin, currentY, paintText)
+            
+            paintLine.color = android.graphics.Color.rgb(0, 100, 80)
+            paintLine.strokeWidth = 2f
+            paintLine.style = android.graphics.Paint.Style.STROKE
+            canvas.drawLine(margin, currentY + 4f, 595f - margin, currentY + 4f, paintLine)
+            
+            currentY += 24f
+
+            val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(audit.fecha))
+            
+            paintText.color = android.graphics.Color.BLACK
+            paintText.textSize = 10f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            
+            val col1X = margin + 10f
+            val col2X = 300f
+            
+            canvas.drawText("Evaluador: ${audit.evaluador}", col1X, currentY, paintText)
+            canvas.drawText("Operario: ${audit.operarioCalib}", col2X, currentY, paintText)
+            currentY += 16f
+            
+            canvas.drawText("Finca: ${audit.finca}", col1X, currentY, paintText)
+            canvas.drawText("Tractor: ${audit.tractorCalib}", col2X, currentY, paintText)
+            currentY += 16f
+            
+            canvas.drawText("Lote: ${audit.lote}", col1X, currentY, paintText)
+            canvas.drawText("Implemento: ${audit.implementoCalib}", col2X, currentY, paintText)
+            currentY += 16f
+            
+            canvas.drawText("Fecha: $dateStr", col1X, currentY, paintText)
+            canvas.drawText("Volumen Tanque: ${audit.volumenTanque} L", col2X, currentY, paintText)
+            currentY += 16f
+            
+            canvas.drawText("Hora: ${audit.hora}", col1X, currentY, paintText)
+            currentY += 24f
+
+            // 3. TECHNICAL SPECIFICATIONS SECTION
+            paintText.color = android.graphics.Color.rgb(0, 100, 80)
+            paintText.textSize = 14f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            canvas.drawText("ESPECIFICACIONES TÉCNICAS", margin, currentY, paintText)
+            canvas.drawLine(margin, currentY + 4f, 595f - margin, currentY + 4f, paintLine)
+            currentY += 24f
+
+            paintText.color = android.graphics.Color.BLACK
+            paintText.textSize = 10f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            
+            canvas.drawText("Número de boquillas: ${audit.numBoquillas}", col1X, currentY, paintText)
+            canvas.drawText("Tiempo de descarga: ${audit.tiempoCalib} s", col2X, currentY, paintText)
+            currentY += 16f
+            
+            canvas.drawText("Tipo de boquillas: ${audit.tipoBoquillas}", col1X, currentY, paintText)
+            canvas.drawText("Descarga promedio: ${audit.descargaCalib} cc", col2X, currentY, paintText)
+            currentY += 16f
+            
+            canvas.drawText("Referencia boquillas: ${audit.referenciaBoquillas}", col1X, currentY, paintText)
+            currentY += 24f
+
+            // 4. RUNS TABLE (CÁLCULOS DE RECORRIDO)
+            paintText.color = android.graphics.Color.rgb(0, 100, 80)
+            paintText.textSize = 14f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            canvas.drawText("CÁLCULOS DE RECORRIDO", margin, currentY, paintText)
+            canvas.drawLine(margin, currentY + 4f, 595f - margin, currentY + 4f, paintLine)
+            currentY += 24f
+
+            // Table Header Background
+            paintLine.color = android.graphics.Color.rgb(235, 245, 240)
+            paintLine.style = android.graphics.Paint.Style.FILL
+            canvas.drawRect(margin, currentY - 12f, 595f - margin, currentY + 12f, paintLine)
+
+            paintText.color = android.graphics.Color.rgb(0, 100, 80)
+            paintText.textSize = 9f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            
+            val tCol1 = margin + 10f
+            val tCol2 = margin + 100f
+            val tCol3 = margin + 200f
+            val tCol4 = margin + 300f
+            val tCol5 = margin + 400f
+            
+            canvas.drawText("Corrida #", tCol1, currentY, paintText)
+            canvas.drawText("Distancia (m)", tCol2, currentY, paintText)
+            canvas.drawText("Tiempo (s)", tCol3, currentY, paintText)
+            canvas.drawText("Volumen (L)", tCol4, currentY, paintText)
+            canvas.drawText("Velocidad (km/h)", tCol5, currentY, paintText)
+            
+            paintLine.color = android.graphics.Color.rgb(200, 200, 200)
+            paintLine.style = android.graphics.Paint.Style.STROKE
+            paintLine.strokeWidth = 1f
+            canvas.drawLine(margin, currentY + 12f, 595f - margin, currentY + 12f, paintLine)
+            
+            currentY += 24f
+
+            paintText.color = android.graphics.Color.BLACK
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            
+            val validRuns = audit.calculosRecorrido.filter { it.distancia > 0.0 && it.tiempo > 0.0 }
+            
+            validRuns.forEachIndexed { i, run ->
+                val vKmh = (run.distancia / run.tiempo) * 3.6
+                canvas.drawText("Corrida #${i + 1}", tCol1, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", run.distancia), tCol2, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", run.tiempo), tCol3, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", run.volumenAplicado), tCol4, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", vKmh), tCol5, currentY, paintText)
+                
+                canvas.drawLine(margin, currentY + 4f, 595f - margin, currentY + 4f, paintLine)
+                currentY += 18f
+            }
+
+            if (validRuns.isNotEmpty()) {
+                val avgDist = validRuns.map { it.distancia }.average()
+                val avgTime = validRuns.map { it.tiempo }.average()
+                val avgVol = validRuns.map { it.volumenAplicado }.average()
+                val avgVel = if (avgTime > 0.0) avgDist / avgTime else 0.0
+                val avgVelKmh = avgVel * 3.6
+
+                paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                canvas.drawText("PROMEDIO", tCol1, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", avgDist), tCol2, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", avgTime), tCol3, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", avgVol), tCol4, currentY, paintText)
+                canvas.drawText(String.format(java.util.Locale.US, "%.2f", avgVelKmh), tCol5, currentY, paintText)
+
+                paintLine.color = android.graphics.Color.rgb(0, 100, 80)
+                paintLine.strokeWidth = 1.5f
+                canvas.drawLine(margin, currentY + 4f, 595f - margin, currentY + 4f, paintLine)
+                currentY += 28f
+            } else {
+                canvas.drawText("No se registraron corridas de recorrido válidas.", margin + 10f, currentY, paintText)
+                currentY += 28f
+            }
+
+            // 5. CALCULATED RESULTS SECTION
+            paintText.color = android.graphics.Color.rgb(0, 100, 80)
+            paintText.textSize = 14f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            canvas.drawText("RESULTADOS FINALES Y CÁLCULOS", margin, currentY, paintText)
+            canvas.drawLine(margin, currentY + 4f, 595f - margin, currentY + 4f, paintLine)
+            currentY += 24f
+
+            paintLine.color = android.graphics.Color.rgb(0, 100, 80)
+            paintLine.style = android.graphics.Paint.Style.STROKE
+            paintLine.strokeWidth = 1f
+            canvas.drawRect(margin, currentY - 12f, 595f - margin, currentY + 130f, paintLine)
+
+            paintText.color = android.graphics.Color.BLACK
+            paintText.textSize = 10f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+
+            val rCol1 = margin + 15f
+            val rCol2 = 300f
+
+            val q = if (audit.tiempoCalib > 0.0) (audit.descargaCalib / audit.tiempoCalib) * 0.06 else 0.0
+            val qTot = audit.numBoquillas * q
+            val avgDist = if (validRuns.isNotEmpty()) validRuns.map { it.distancia }.average() else 0.0
+            val avgTime = if (validRuns.isNotEmpty()) validRuns.map { it.tiempo }.average() else 0.0
+            val avgVol = if (validRuns.isNotEmpty()) validRuns.map { it.volumenAplicado }.average() else 0.0
+            val avgVel = if (avgTime > 0.0) avgDist / avgTime else 0.0
+            val avgVelKmh = avgVel * 3.6
+            
+            val w = audit.numBoquillas * 0.5
+            val areaRecHa = (w * avgDist) / 10000.0
+            val dosReal = if (areaRecHa > 0.0) avgVol / areaRecHa else 0.0
+            val areaTotTanq = if (dosReal > 0.0) audit.volumenTanque / dosReal else 0.0
+            val velReq = q * 0.6
+
+            canvas.drawText("Caudal por Boquilla: ${String.format(java.util.Locale.US, "%.3f", q)} L/min", rCol1, currentY, paintText)
+            canvas.drawText("Velocidad Promedio: ${String.format(java.util.Locale.US, "%.2f", avgVelKmh)} km/h", rCol2, currentY, paintText)
+            currentY += 18f
+
+            canvas.drawText("Caudal Total Barra: ${String.format(java.util.Locale.US, "%.3f", qTot)} L/min", rCol1, currentY, paintText)
+            canvas.drawText("Área Recorrida Promedio: ${String.format(java.util.Locale.US, "%.4f", areaRecHa)} Ha", rCol2, currentY, paintText)
+            currentY += 18f
+
+            canvas.drawText("Ancho de Barra (asumido 50cm esp.): ${String.format(java.util.Locale.US, "%.1f", w)} m", rCol1, currentY, paintText)
+            canvas.drawText("Dosis Real Aplicada: ${String.format(java.util.Locale.US, "%.1f", dosReal)} L/Ha", rCol2, currentY, paintText)
+            currentY += 18f
+
+            canvas.drawText("Área Total por Tanque: ${String.format(java.util.Locale.US, "%.2f", areaTotTanq)} Ha", rCol1, currentY, paintText)
+            currentY += 24f
+
+            paintText.textSize = 11f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            paintText.color = android.graphics.Color.rgb(0, 100, 80)
+            canvas.drawText("Velocidad requerida para llegar a 2000 L/Ha: ${String.format(java.util.Locale.US, "%.2f", velReq)} km/h", rCol1, currentY, paintText)
+            currentY += 40f
+
+            // Observaciones
+            paintText.color = android.graphics.Color.BLACK
+            paintText.textSize = 10f
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            canvas.drawText("Observaciones:", margin, currentY, paintText)
+            currentY += 14f
+
+            paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            val obsText = if (audit.observaciones.isNotEmpty()) audit.observaciones else "Ninguna"
+            
+            val limit = 85
+            if (obsText.length > limit) {
+                val line1 = obsText.substring(0, limit)
+                val line2 = obsText.substring(limit)
+                canvas.drawText(line1, margin + 5f, currentY, paintText)
+                currentY += 14f
+                canvas.drawText(line2, margin + 5f, currentY, paintText)
+            } else {
+                canvas.drawText(obsText, margin + 5f, currentY, paintText)
+            }
+
+            // Footer
+            currentY = 800f
+            paintText.textSize = 8f
+            paintText.color = android.graphics.Color.GRAY
+            paintText.textAlign = android.graphics.Paint.Align.CENTER
+            canvas.drawText("Reporte generado automáticamente por la aplicación Auditorías Aplicaciones. CT&A 2026.", 595f / 2f, currentY, paintText)
+
+            pdfDocument.finishPage(page)
+
+            val fileName = "Reporte_Calibracion_${audit.lote}_${System.currentTimeMillis()}.pdf"
+            val resolver = context.contentResolver
+            val contentValues = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+            }
+
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            } else {
+                val file = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    fileName
+                )
+                Uri.fromFile(file)
+            }
+
+            if (uri != null) {
+                resolver.openOutputStream(uri)?.use { outputStream ->
+                    pdfDocument.writeTo(outputStream)
+                }
+                pdfDocument.close()
+                Toast.makeText(context, "PDF guardado en Descargas: $fileName", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "Error: No se pudo crear el PDF en Descargas.", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Error generando PDF: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }
