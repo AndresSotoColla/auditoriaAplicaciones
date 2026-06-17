@@ -759,42 +759,44 @@ fun DatosGeneralesScreen(
             shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
         )
 
-        OutlinedTextField(
-            value = lote,
-            onValueChange = { 
-                if (it.isEmpty()) {
-                    lote = it
-                    finca = ""
-                } else if (it.all { char -> char.isDigit() }) {
-                    val loteInt = it.toIntOrNull() ?: 0
-                    if (loteInt <= 87) {
-                        lote = it 
-                        finca = when (loteInt) {
-                            in 1..20 -> "LA FE"
-                            in 21..27 -> "SULTANA"
-                            in 28..39 -> "JAMAICA"
-                            in 40..55 -> "EGIPTO"
-                            in 56..65 -> "AMÉRICAS"
-                            in 66..76 -> "BRASIL"
-                            in 77..87 -> "ARGENTINA"
-                            else -> ""
+        if (infoInicial.tipoAuditoria != "Calibracion Spray Boom") {
+            OutlinedTextField(
+                value = lote,
+                onValueChange = { 
+                    if (it.isEmpty()) {
+                        lote = it
+                        finca = ""
+                    } else if (it.all { char -> char.isDigit() }) {
+                        val loteInt = it.toIntOrNull() ?: 0
+                        if (loteInt <= 87) {
+                            lote = it 
+                            finca = when (loteInt) {
+                                in 1..20 -> "LA FE"
+                                in 21..27 -> "SULTANA"
+                                in 28..39 -> "JAMAICA"
+                                in 40..55 -> "EGIPTO"
+                                in 56..65 -> "AMÉRICAS"
+                                in 66..76 -> "BRASIL"
+                                in 77..87 -> "ARGENTINA"
+                                else -> ""
+                            }
                         }
                     }
-                }
-            },
-            label = { Text("Lote (01 - 87)") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-        )
+                },
+                label = { Text("Lote (01 - 87)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+            )
 
-        OutlinedTextField(
-            value = finca,
-            onValueChange = { finca = it },
-            label = { Text("Finca") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
-        )
+            OutlinedTextField(
+                value = finca,
+                onValueChange = { finca = it },
+                label = { Text("Finca") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors()
+            )
+        }
 
         if (infoInicial.tipoAuditoria == "Mezclas") {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.1f))
@@ -858,11 +860,16 @@ fun DatosGeneralesScreen(
                     }
                     Button(
                         onClick = {
-                            val loteNum = lote.toIntOrNull() ?: 0
+                            val isCalibracion = infoInicial.tipoAuditoria == "Calibracion Spray Boom"
+                            val loteNum = if (isCalibracion) 0 else (lote.toIntOrNull() ?: 0)
                             
-                            if (evaluador.isBlank() || finca.isBlank() || lote.isBlank()) {
-                                debugErrorMsg = "ERROR: Faltan campos básicos.\nEvaluador='${evaluador}'\nFinca='${finca}'\nLote='${lote}'"
-                            } else if (loteNum !in 1..87) {
+                            if (evaluador.isBlank() || (!isCalibracion && (finca.isBlank() || lote.isBlank()))) {
+                                debugErrorMsg = if (isCalibracion) {
+                                    "ERROR: Faltan campos básicos.\nEvaluador='${evaluador}'"
+                                } else {
+                                    "ERROR: Faltan campos básicos.\nEvaluador='${evaluador}'\nFinca='${finca}'\nLote='${lote}'"
+                                }
+                            } else if (!isCalibracion && loteNum !in 1..87) {
                                 debugErrorMsg = "ERROR: Lote '${lote}' (numeral=$loteNum) no está entre 1 y 87."
                             } else {
                                 debugErrorMsg = "Navegando a FormularioAuditoria..."
@@ -2109,7 +2116,12 @@ object ExportManager {
                     val avgVol = if (validRuns.isNotEmpty()) validRuns.map { it.volumenAplicado }.average() else 0.0
                     val avgVelKmh = if (avgTime > 0.0) (avgDist / avgTime) * 3.6 else 0.0
                     
-                    val w = audit.numBoquillas * 0.5
+                    val distBoquillas = when (audit.implementoCalib) {
+                        "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
+                        "IA - 64", "IA - 67" -> 0.3
+                        else -> 0.5
+                    }
+                    val w = audit.numBoquillas * distBoquillas
                     val areaRecHa = (w * avgDist) / 10000.0
                     val dosReal = if (areaRecHa > 0.0) avgVol / areaRecHa else 0.0
                     val areaTotTanq = if (dosReal > 0.0) audit.volumenTanque / dosReal else 0.0
@@ -2867,10 +2879,31 @@ fun FormularioCalibracionScreen(
     onContinue: (AuditoriaInfo) -> Unit
 ) {
     var operario by rememberSaveable { mutableStateOf(info.operarioCalib) }
-    var codTractor by rememberSaveable { mutableStateOf(info.tractorCalib) }
-    var volumenTanqueStr by rememberSaveable { mutableStateOf(if (info.volumenTanque > 0.0) info.volumenTanque.toString() else "") }
     var codImplemento by rememberSaveable { mutableStateOf(info.implementoCalib) }
-    var numBoquillasStr by rememberSaveable { mutableStateOf(if (info.numBoquillas > 0) info.numBoquillas.toString() else "") }
+    
+    var codTractor by rememberSaveable { 
+        mutableStateOf(
+            if (info.tractorCalib.isNotEmpty()) info.tractorCalib
+            else if (info.implementoCalib.isNotEmpty()) "TA-12"
+            else "TA-12"
+        ) 
+    }
+    
+    var numBoquillasStr by rememberSaveable {
+        mutableStateOf(
+            if (info.numBoquillas > 0) info.numBoquillas.toString()
+            else when (info.implementoCalib) {
+                "IA - 14" -> "40"
+                "IA - 28" -> "45"
+                "IA - 53 (VALOR)" -> "44"
+                "IA - 64" -> "52"
+                "IA - 67" -> "52"
+                else -> ""
+            }
+        )
+    }
+
+    var volumenTanqueStr by rememberSaveable { mutableStateOf(if (info.volumenTanque > 0.0) info.volumenTanque.toString() else "") }
     var tipoBoquillas by rememberSaveable { mutableStateOf(info.tipoBoquillas) }
     var referenciaBoquillas by rememberSaveable { mutableStateOf(info.referenciaBoquillas) }
     var tiempoStr by rememberSaveable { mutableStateOf(if (info.tiempoCalib > 0.0) info.tiempoCalib.toString() else "") }
@@ -2879,10 +2912,22 @@ fun FormularioCalibracionScreen(
     var observaciones by rememberSaveable { mutableStateOf(info.observaciones) }
 
     val context = LocalContext.current
-    val tractorList = remember { List(41) { "TA-${(it + 1).toString().padStart(2, '0')}" } }
-    val implementList = remember { List(81) { "IA-${(it + 1).toString().padStart(2, '0')}" } }
-    var expandedTractor by rememberSaveable { mutableStateOf(false) }
+    val implementList = remember { listOf("IA - 14", "IA - 28", "IA - 53 (VALOR)", "IA - 64", "IA - 67") }
     var expandedImplement by rememberSaveable { mutableStateOf(false) }
+
+    val distBoquillas = when (codImplemento) {
+        "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
+        "IA - 64", "IA - 67" -> 0.3
+        else -> 0.5
+    }
+
+    val longitudBrazo = when (codImplemento) {
+        "IA - 14", "IA - 53 (VALOR)" -> 15.3
+        "IA - 28" -> 15.8
+        "IA - 64" -> 14.65
+        "IA - 67" -> 14.24
+        else -> 0.0
+    }
 
     val numBoquillas = numBoquillasStr.toIntOrNull() ?: 0
     val tiempoVal = tiempoStr.toDoubleOrNull() ?: 0.0
@@ -2902,8 +2947,8 @@ fun FormularioCalibracionScreen(
     val avgVelocidad = if (avgTiempo > 0.0) avgDistancia / avgTiempo else 0.0 // m/s
     val avgVelocidadKmh = avgVelocidad * 3.6
 
-    // Ancho de trabajo (m) = numBoquillas * 0.5
-    val anchoTrabajo = numBoquillas * 0.5
+    // Ancho de trabajo (m) = numBoquillas * distBoquillas
+    val anchoTrabajo = numBoquillas * distBoquillas
     val areaRecorridaHa = (anchoTrabajo * avgDistancia) / 10000.0
     val dosisRealLHa = if (areaRecorridaHa > 0.0) avgVolumen / areaRecorridaHa else 0.0
     val areaTotalTanqueHa = if (dosisRealLHa > 0.0) volTanqueVal / dosisRealLHa else 0.0
@@ -2960,8 +3005,12 @@ fun FormularioCalibracionScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(text = "Evaluador: ${info.evaluador}", fontSize = 14.sp)
-                        Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
-                        Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
+                        if (info.finca.isNotEmpty()) {
+                            Text(text = "Finca: ${info.finca}", fontSize = 14.sp)
+                        }
+                        if (info.lote.isNotEmpty()) {
+                            Text(text = "Lote: ${info.lote}", fontSize = 14.sp)
+                        }
                         Text(text = "Fecha: ${dateFormatter.format(Date(info.fecha))}", fontSize = 14.sp)
                         Text(text = "Hora: ${info.hora}", fontSize = 14.sp)
                     }
@@ -2983,42 +3032,59 @@ fun FormularioCalibracionScreen(
                     colors = blackTextFieldColors()
                 )
 
-                // Tractor selector
+                // Implement selector
                 ExposedDropdownMenuBox(
-                    expanded = expandedTractor,
-                    onExpandedChange = { expandedTractor = !expandedTractor },
+                    expanded = expandedImplement,
+                    onExpandedChange = { expandedImplement = !expandedImplement },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = codTractor,
-                        onValueChange = { 
-                            codTractor = it
-                            expandedTractor = true
-                        },
-                        label = { Text("Código de Tractor") },
+                        value = codImplemento,
+                        onValueChange = {},
+                        label = { Text("Código de implemento") },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
+                        colors = blackTextFieldColors(),
+                        readOnly = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedImplement)
+                        }
                     )
-                    val filteredTractors = tractorList.filter { it.contains(codTractor, ignoreCase = true) }
-                    if (filteredTractors.isNotEmpty() && expandedTractor) {
-                        DropdownMenu(
-                            expanded = expandedTractor,
-                            onDismissRequest = { expandedTractor = false },
-                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
-                        ) {
-                            filteredTractors.forEach { cod ->
-                                DropdownMenuItem(
-                                    text = { Text(cod, color = Color.Black) },
-                                    onClick = {
-                                        codTractor = cod
-                                        expandedTractor = false
+                    DropdownMenu(
+                        expanded = expandedImplement,
+                        onDismissRequest = { expandedImplement = false },
+                        modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                    ) {
+                        implementList.forEach { cod ->
+                            DropdownMenuItem(
+                                text = { Text(cod, color = Color.Black) },
+                                onClick = {
+                                    codImplemento = cod
+                                    expandedImplement = false
+                                    codTractor = "TA-12"
+                                    numBoquillasStr = when (cod) {
+                                        "IA - 14" -> "40"
+                                        "IA - 28" -> "45"
+                                        "IA - 53 (VALOR)" -> "44"
+                                        "IA - 64" -> "52"
+                                        "IA - 67" -> "52"
+                                        else -> ""
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
                 }
+
+                OutlinedTextField(
+                    value = codTractor,
+                    onValueChange = {},
+                    label = { Text("Código de Tractor") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
 
                 OutlinedTextField(
                     value = volumenTanqueStr,
@@ -3030,51 +3096,34 @@ fun FormularioCalibracionScreen(
                     colors = blackTextFieldColors()
                 )
 
-                // Implement selector
-                ExposedDropdownMenuBox(
-                    expanded = expandedImplement,
-                    onExpandedChange = { expandedImplement = !expandedImplement },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = codImplemento,
-                        onValueChange = { 
-                            codImplemento = it
-                            expandedImplement = true
-                        },
-                        label = { Text("Código de implemento") },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
-                    )
-                    val filteredImplements = implementList.filter { it.contains(codImplemento, ignoreCase = true) }
-                    if (filteredImplements.isNotEmpty() && expandedImplement) {
-                        DropdownMenu(
-                            expanded = expandedImplement,
-                            onDismissRequest = { expandedImplement = false },
-                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
-                        ) {
-                            filteredImplements.forEach { cod ->
-                                DropdownMenuItem(
-                                    text = { Text(cod, color = Color.Black) },
-                                    onClick = {
-                                        codImplemento = cod
-                                        expandedImplement = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
                 OutlinedTextField(
                     value = numBoquillasStr,
-                    onValueChange = { numBoquillasStr = it },
+                    onValueChange = {},
                     label = { Text("Número de boquillas") },
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
+
+                OutlinedTextField(
+                    value = if (codImplemento.isNotEmpty()) "$distBoquillas m" else "",
+                    onValueChange = {},
+                    label = { Text("Dist. entre Boquillas") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
+
+                OutlinedTextField(
+                    value = if (codImplemento.isNotEmpty()) "$longitudBrazo m" else "",
+                    onValueChange = {},
+                    label = { Text("Longitud Brazo") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
                 )
 
                 OutlinedTextField(
@@ -3207,7 +3256,7 @@ fun FormularioCalibracionScreen(
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(text = "Ancho trabajo (barra):", color = Color.Black, fontWeight = FontWeight.SemiBold)
-                            Text(text = "${String.format(Locale.US, "%.1f", anchoTrabajo)} m (boquillas * 0.5m)", color = Color.DarkGray, fontSize = 12.sp)
+                            Text(text = "${String.format(Locale.US, "%.2f", anchoTrabajo)} m (boquillas * ${distBoquillas}m)", color = Color.DarkGray, fontSize = 12.sp)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(text = "Área recorrida prom:", color = Color.Black, fontWeight = FontWeight.SemiBold)
@@ -3344,11 +3393,15 @@ object PdfExportManager {
             canvas.drawText("Operario: ${audit.operarioCalib}", col2X, currentY, paintText)
             currentY += 16f
             
-            canvas.drawText("Finca: ${audit.finca}", col1X, currentY, paintText)
+            if (audit.finca.isNotEmpty()) {
+                canvas.drawText("Finca: ${audit.finca}", col1X, currentY, paintText)
+            }
             canvas.drawText("Tractor: ${audit.tractorCalib}", col2X, currentY, paintText)
             currentY += 16f
             
-            canvas.drawText("Lote: ${audit.lote}", col1X, currentY, paintText)
+            if (audit.lote.isNotEmpty()) {
+                canvas.drawText("Lote: ${audit.lote}", col1X, currentY, paintText)
+            }
             canvas.drawText("Implemento: ${audit.implementoCalib}", col2X, currentY, paintText)
             currentY += 16f
             
@@ -3371,6 +3424,19 @@ object PdfExportManager {
             paintText.textSize = 10f
             paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
             
+            val distBoquillas = when (audit.implementoCalib) {
+                "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
+                "IA - 64", "IA - 67" -> 0.3
+                else -> 0.5
+            }
+            val longitudBrazo = when (audit.implementoCalib) {
+                "IA - 14", "IA - 53 (VALOR)" -> 15.3
+                "IA - 28" -> 15.8
+                "IA - 64" -> 14.65
+                "IA - 67" -> 14.24
+                else -> 0.0
+            }
+            
             canvas.drawText("Número de boquillas: ${audit.numBoquillas}", col1X, currentY, paintText)
             canvas.drawText("Tiempo de descarga: ${audit.tiempoCalib} s", col2X, currentY, paintText)
             currentY += 16f
@@ -3380,7 +3446,15 @@ object PdfExportManager {
             currentY += 16f
             
             canvas.drawText("Referencia boquillas: ${audit.referenciaBoquillas}", col1X, currentY, paintText)
-            currentY += 24f
+            canvas.drawText("Dist. entre Boquillas: ${distBoquillas} m", col2X, currentY, paintText)
+            currentY += 16f
+            
+            if (longitudBrazo > 0.0) {
+                canvas.drawText("Longitud Brazo: ${longitudBrazo} m", col1X, currentY, paintText)
+                currentY += 24f
+            } else {
+                currentY += 8f
+            }
 
             // 4. RUNS TABLE (CÁLCULOS DE RECORRIDO)
             paintText.color = android.graphics.Color.rgb(0, 100, 80)
@@ -3486,7 +3560,12 @@ object PdfExportManager {
             val avgVel = if (avgTime > 0.0) avgDist / avgTime else 0.0
             val avgVelKmh = avgVel * 3.6
             
-            val w = audit.numBoquillas * 0.5
+            val distBoquillasVal = when (audit.implementoCalib) {
+                "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
+                "IA - 64", "IA - 67" -> 0.3
+                else -> 0.5
+            }
+            val w = audit.numBoquillas * distBoquillasVal
             val areaRecHa = (w * avgDist) / 10000.0
             val dosReal = if (areaRecHa > 0.0) avgVol / areaRecHa else 0.0
             val areaTotTanq = if (dosReal > 0.0) audit.volumenTanque / dosReal else 0.0
@@ -3500,7 +3579,7 @@ object PdfExportManager {
             canvas.drawText("Área Recorrida Promedio: ${String.format(java.util.Locale.US, "%.4f", areaRecHa)} Ha", rCol2, currentY, paintText)
             currentY += 18f
 
-            canvas.drawText("Ancho de Barra (asumido 50cm esp.): ${String.format(java.util.Locale.US, "%.1f", w)} m", rCol1, currentY, paintText)
+            canvas.drawText("Ancho de Barra (${String.format(java.util.Locale.US, "%.0f", distBoquillasVal * 100)}cm esp.): ${String.format(java.util.Locale.US, "%.2f", w)} m", rCol1, currentY, paintText)
             canvas.drawText("Dosis Real Aplicada: ${String.format(java.util.Locale.US, "%.1f", dosReal)} L/Ha", rCol2, currentY, paintText)
             currentY += 18f
 
@@ -3543,7 +3622,11 @@ object PdfExportManager {
 
             pdfDocument.finishPage(page)
 
-            val fileName = "Reporte_Calibracion_${audit.lote}_${System.currentTimeMillis()}.pdf"
+            val fileName = if (audit.lote.isNotEmpty()) {
+                "Reporte_Calibracion_${audit.lote}_${System.currentTimeMillis()}.pdf"
+            } else {
+                "Reporte_Calibracion_${System.currentTimeMillis()}.pdf"
+            }
             val resolver = context.contentResolver
             val contentValues = android.content.ContentValues().apply {
                 put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
