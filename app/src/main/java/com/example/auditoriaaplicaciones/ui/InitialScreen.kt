@@ -2282,7 +2282,8 @@ object ExportManager {
                 "TipoBoquillas", "ReferenciaBoquillas", "TiempoDescarga", "Descarga", 
                 "CaudalBoquilla", "CaudalTotal", "PromedioDistancia", "PromedioTiempo", 
                 "PromedioVelocidadKmh", "AreaRecorridaHa", "AreaTotalTanqueHa", 
-                "VelocidadRequeridaKmh", "Observaciones", "CalculosRecorrido (JSON)"
+                "VelocidadRequeridaKmh", "Observaciones", "CalculosRecorrido (JSON)",
+                "DistBoquillas", "LongitudBrazo"
             )
 
             // Setup Spray Boom Sheet
@@ -2380,6 +2381,20 @@ row.createCell(16).setCellValue(qTot)
                     
                     val jsonRecorridos = com.google.gson.Gson().toJson(audit.calculosRecorrido)
                     row.createCell(24).setCellValue(jsonRecorridos)
+                    
+                    val distBoqVal = audit.distBoquillasCalib.toDoubleOrNull()
+                    if (distBoqVal != null) {
+                        row.createCell(25).setCellValue(distBoqVal)
+                    } else {
+                        row.createCell(25).setCellValue(audit.distBoquillasCalib)
+                    }
+
+                    val longBrazoVal = audit.longitudBrazoCalib.toDoubleOrNull()
+                    if (longBrazoVal != null) {
+                        row.createCell(26).setCellValue(longBrazoVal)
+                    } else {
+                        row.createCell(26).setCellValue(audit.longitudBrazoCalib)
+                    }
                 } else {
                     val row = sbSheet.createRow(sbRowIdx++)
                 
