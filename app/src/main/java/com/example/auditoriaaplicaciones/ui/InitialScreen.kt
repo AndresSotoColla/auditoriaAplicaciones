@@ -191,7 +191,60 @@ data class AuditoriaInfo(
     var tiempoCalib: Double = 0.0,
     var descargaCalib: Double = 0.0,
     var calculosRecorrido: List<CalculoRecorrido> = emptyList()
-) : Serializable
+) : Serializable {
+    fun getVolumenPercent(): Float {
+        val nTotal = (cantidadBoquillasIzquierdas.toIntOrNull() ?: 0) + (cantidadBoquillasDerechas.toIntOrNull() ?: 0)
+        val longIzqVal = longitudBrazoIzquierdo.toFloatOrNull() ?: 0f
+        val longDerVal = longitudBrazoDerecho.toFloatOrNull() ?: 0f
+        val allEvaluated = nozzlesIzquierdo + nozzlesDerecho
+        val lhaResults = mutableListOf<Float>()
+        
+        allEvaluated.forEach { nozzle ->
+            val nTime = nozzle.tiempoSegundos.toFloat()
+            val nVol = nozzle.volumen.toFloatOrNull() ?: 0f
+            if (nTime > 0f) {
+                val flow = nVol / nTime
+                val totalVolTripL = (flow * tiempoDesplazamientoSegundos) / 1000f
+                val isLeft = nozzlesIzquierdo.any { it.id == nozzle.id }
+                val armLen = if (isLeft) longIzqVal else longDerVal
+                if (armLen > 0f) {
+                    val areaHa = (armLen * distanciaMetros) / 10000f
+                    if (areaHa > 0f) {
+                        val lhaIndividual = (totalVolTripL / areaHa) * nTotal
+                        lhaResults.add(lhaIndividual)
+                    }
+                }
+            }
+        }
+        val avgLHa = if (lhaResults.isNotEmpty()) lhaResults.average().toFloat() else 0f
+        return if (avgLHa > 0f) (avgLHa / 2000f) * 100f else 0f
+    }
+
+    fun getAlturaPercent(): Float {
+        return if (alturaUniforme == true) 100f else 0f
+    }
+
+    fun getBoquillasTapadasPercent(): Float {
+        val nTotal = (cantidadBoquillasIzquierdas.toIntOrNull() ?: 0) + (cantidadBoquillasDerechas.toIntOrNull() ?: 0)
+        val numClogged = if (boquillasTapadas == true) (boquillasTapadasNum.toIntOrNull() ?: 0) else 0
+        return if (nTotal > 0) ((nTotal - numClogged).toFloat() / nTotal.toFloat()) * 100f else 100f
+    }
+
+    fun getUniformidadPercent(): Double {
+        val allEvaluated = nozzlesIzquierdo + nozzlesDerecho
+        val flowsMLs = mutableListOf<Double>()
+        allEvaluated.forEach { nozzle ->
+            val nTime = nozzle.tiempoSegundos.toDouble()
+            val nVol = nozzle.volumen.toDoubleOrNull() ?: 0.0
+            if (nTime > 0.0) {
+                flowsMLs.add(nVol / nTime)
+            }
+        }
+        val meanFlow = if (flowsMLs.isNotEmpty()) flowsMLs.average() else 0.0
+        val avgDevFlow = if (flowsMLs.isNotEmpty()) flowsMLs.map { Math.abs(it - meanFlow) }.average() else 0.0
+        return if (meanFlow > 0.0) (1.0 - (avgDevFlow / meanFlow)) * 100.0 else 0.0
+    }
+}
 
 @Composable
 fun blackTextFieldColors() = OutlinedTextFieldDefaults.colors(
@@ -1641,45 +1694,23 @@ fun FormularioAuditoriaScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
                 if (showRecommendationDialog) {
-                    val nTotal = (cantidadBoquillasIzquierdas.toIntOrNull() ?: 0) + (cantidadBoquillasDerechas.toIntOrNull() ?: 0)
-                    val numClogged = if (boquillasTapadas == true) (boquillasTapadasNum.toIntOrNull() ?: 0) else 0
-                    
-                    val allEvaluated = leftNozzles + rightNozzles
-                    val flowsMLs = mutableListOf<Float>()
-                    val lhaResults = mutableListOf<Float>()
-                    
-                    val dist = calcDistance
-                    val vTime = calcTimeSec
-                    val longIzqVal = longitudBrazoIzquierdo.toFloatOrNull() ?: 0f
-                    val longDerVal = longitudBrazoDerecho.toFloatOrNull() ?: 0f
-                    
-                    allEvaluated.forEach { nozzle ->
-                        val nTime = nozzle.tiempoSegundos.toFloat()
-                        val nVol = nozzle.volumen.toFloatOrNull() ?: 0f
-                        if (nTime > 0) {
-                            val flow = nVol / nTime
-                            flowsMLs.add(flow)
-                            val totalVolTripL = (flow * vTime) / 1000f
-                            val isLeft = leftNozzles.any { it.id == nozzle.id }
-                            val armLen = if (isLeft) longIzqVal else longDerVal
-                            if (armLen > 0) {
-                                val areaHa = (armLen * dist) / 10000f
-                                if (areaHa > 0) {
-                                    val lhaIndividual = (totalVolTripL / areaHa) * nTotal
-                                    lhaResults.add(lhaIndividual)
-                                }
-                            }
-                        }
-                    }
-                    
-                    val avgLHa = if (lhaResults.isNotEmpty()) lhaResults.average().toFloat() else 0f
-                    val volumenPercent = if (avgLHa > 0f) (avgLHa / 2000f) * 100f else 0f
-                    val alturaPercent = if (alturaUniforme == true) 100f else 0f
-                    val boquillasPercent = if (nTotal > 0) ((nTotal - numClogged).toFloat() / nTotal.toFloat()) * 100f else 100f
-                    
-                    val meanFlow = if (flowsMLs.isNotEmpty()) flowsMLs.average() else 0.0
-                    val avgDevFlow = if (flowsMLs.isNotEmpty()) flowsMLs.map { Math.abs(it - meanFlow) }.average() else 0.0
-                    val uniformidadPercent = if (meanFlow > 0.0) (1.0 - (avgDevFlow / meanFlow)) * 100.0 else 0.0
+                    val tempInfo = info.copy(
+                        longitudBrazoIzquierdo = longitudBrazoIzquierdo,
+                        longitudBrazoDerecho = longitudBrazoDerecho,
+                        cantidadBoquillasIzquierdas = cantidadBoquillasIzquierdas,
+                        cantidadBoquillasDerechas = cantidadBoquillasDerechas,
+                        nozzlesIzquierdo = leftNozzles,
+                        nozzlesDerecho = rightNozzles,
+                        tiempoDesplazamientoSegundos = calcTimeSec,
+                        distanciaMetros = calcDistance,
+                        boquillasTapadas = boquillasTapadas,
+                        boquillasTapadasNum = boquillasTapadasNum,
+                        alturaUniforme = alturaUniforme
+                    )
+                    val volumenPercent = tempInfo.getVolumenPercent()
+                    val alturaPercent = tempInfo.getAlturaPercent()
+                    val boquillasPercent = tempInfo.getBoquillasTapadasPercent()
+                    val uniformidadPercent = tempInfo.getUniformidadPercent()
 
                     val volCumple = volumenPercent in 90f..100f
                     val altCumple = alturaPercent in 70f..100f
@@ -1688,6 +1719,9 @@ fun FormularioAuditoriaScreen(
 
                     AlertDialog(
                         onDismissRequest = { showRecommendationDialog = false },
+                        containerColor = Color.White,
+                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+                        modifier = Modifier.fillMaxWidth(0.95f).padding(16.dp),
                         title = { Text("Resultados y Recomendaciones", fontWeight = FontWeight.Bold, color = Color.Black) },
                         text = {
                             Column(
@@ -2201,7 +2235,8 @@ object ExportManager {
                 "EstadoVia", "PapelHidro", "Gotas 1cm2", "Tamaño Gotas",
                 "B1_ID", "B1_Pres", "B1_Vol", "B1_Tiempo", "B2_ID", "B2_Pres", "B2_Vol", "B2_Tiempo",
                 "B3_ID", "B3_Pres", "B3_Vol", "B3_Tiempo", "B4_ID", "B4_Pres", "B4_Vol", "B4_Tiempo",
-                "Ubicacion", "Vel_Optima", "Sincronizado", "Observaciones"
+                "Ubicacion", "Vel_Optima", "Sincronizado", "Observaciones",
+                "Volumen_Percent", "Altura_Percent", "Boquillas_Percent", "Uniformidad_Percent"
             )
             
             val mezclasHeaders = arrayOf(
@@ -2366,6 +2401,10 @@ object ExportManager {
                 row.createCell(46).setCellValue(audit.velocidadOptima.toDouble())
                 row.createCell(47).setCellValue(if (audit.isSynced) "SI" else "NO")
                 row.createCell(48).setCellValue(audit.observaciones)
+                row.createCell(49).setCellValue(audit.getVolumenPercent().toDouble())
+                row.createCell(50).setCellValue(audit.getAlturaPercent().toDouble())
+                row.createCell(51).setCellValue(audit.getBoquillasTapadasPercent().toDouble())
+                row.createCell(52).setCellValue(audit.getUniformidadPercent())
                 }
             }
 

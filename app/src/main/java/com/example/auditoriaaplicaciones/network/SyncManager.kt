@@ -62,6 +62,12 @@ object SyncManager {
         jsonMap["velocidad_optima"] = audit.velocidadOptima
         jsonMap["observaciones"] = audit.observaciones
 
+        // 4 Puntajes
+        jsonMap["volumen_percent"] = audit.getVolumenPercent()
+        jsonMap["altura_percent"] = audit.getAlturaPercent()
+        jsonMap["boquillas_percent"] = audit.getBoquillasTapadasPercent()
+        jsonMap["uniformidad_percent"] = audit.getUniformidadPercent()
+
         // Nozzles (B1, B2 from Left; B3, B4 from Right)
         val left = audit.nozzlesIzquierdo
         val right = audit.nozzlesDerecho
