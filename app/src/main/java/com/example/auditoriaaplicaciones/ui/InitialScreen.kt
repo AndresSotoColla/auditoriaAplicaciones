@@ -2117,8 +2117,8 @@ object ExportManager {
                     val avgVelKmh = if (avgTime > 0.0) (avgDist / avgTime) * 3.6 else 0.0
                     
                     val distBoquillas = when (audit.implementoCalib) {
-                        "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
-                        "IA - 64", "IA - 67" -> 0.3
+                        "IA - 14", "IA - 28", "IA - 53", "IA - 81" -> 0.4
+                        "IA - 64", "IA - 67", "IA - 82" -> 0.3
                         else -> 0.5
                     }
                     val w = audit.numBoquillas * distBoquillas
@@ -2893,11 +2893,9 @@ fun FormularioCalibracionScreen(
         mutableStateOf(
             if (info.numBoquillas > 0) info.numBoquillas.toString()
             else when (info.implementoCalib) {
-                "IA - 14" -> "40"
-                "IA - 28" -> "45"
-                "IA - 53 (VALOR)" -> "44"
-                "IA - 64" -> "52"
-                "IA - 67" -> "52"
+                "IA - 14", "IA - 53" -> "80"
+                "IA - 28", "IA - 81", "IA - 64" -> "90"
+                "IA - 67", "IA - 82" -> "100"
                 else -> ""
             }
         )
@@ -2905,27 +2903,27 @@ fun FormularioCalibracionScreen(
 
     var volumenTanqueStr by rememberSaveable { mutableStateOf(if (info.volumenTanque > 0.0) info.volumenTanque.toString() else "") }
     var tipoBoquillas by rememberSaveable { mutableStateOf(info.tipoBoquillas) }
-    var referenciaBoquillas by rememberSaveable { mutableStateOf(info.referenciaBoquillas) }
     var tiempoStr by rememberSaveable { mutableStateOf(if (info.tiempoCalib > 0.0) info.tiempoCalib.toString() else "") }
     var descargaStr by rememberSaveable { mutableStateOf(if (info.descargaCalib > 0.0) info.descargaCalib.toString() else "") }
     var listRecorridos by remember { mutableStateOf(info.calculosRecorrido) }
     var observaciones by rememberSaveable { mutableStateOf(info.observaciones) }
 
     val context = LocalContext.current
-    val implementList = remember { listOf("IA - 14", "IA - 28", "IA - 53 (VALOR)", "IA - 64", "IA - 67") }
+    val implementList = remember { listOf("IA - 14", "IA - 28", "IA - 53", "IA - 64", "IA - 67", "IA - 81", "IA - 82") }
     var expandedImplement by rememberSaveable { mutableStateOf(false) }
+    var expandedTipoBoquillas by rememberSaveable { mutableStateOf(false) }
 
     val distBoquillas = when (codImplemento) {
-        "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
-        "IA - 64", "IA - 67" -> 0.3
+        "IA - 14", "IA - 28", "IA - 53", "IA - 81" -> 0.4
+        "IA - 64", "IA - 67", "IA - 82" -> 0.3
         else -> 0.5
     }
 
     val longitudBrazo = when (codImplemento) {
-        "IA - 14", "IA - 53 (VALOR)" -> 15.3
-        "IA - 28" -> 15.8
+        "IA - 14", "IA - 53" -> 15.3
+        "IA - 28", "IA - 81" -> 15.8
         "IA - 64" -> 14.65
-        "IA - 67" -> 14.24
+        "IA - 67", "IA - 82" -> 14.24
         else -> 0.0
     }
 
@@ -3063,11 +3061,9 @@ fun FormularioCalibracionScreen(
                                     expandedImplement = false
                                     codTractor = "TA-12"
                                     numBoquillasStr = when (cod) {
-                                        "IA - 14" -> "40"
-                                        "IA - 28" -> "45"
-                                        "IA - 53 (VALOR)" -> "44"
-                                        "IA - 64" -> "52"
-                                        "IA - 67" -> "52"
+                                        "IA - 14", "IA - 53" -> "80"
+                                        "IA - 28", "IA - 81", "IA - 64" -> "90"
+                                        "IA - 67", "IA - 82" -> "100"
                                         else -> ""
                                     }
                                 }
@@ -3076,93 +3072,103 @@ fun FormularioCalibracionScreen(
                     }
                 }
 
-                OutlinedTextField(
-                    value = codTractor,
-                    onValueChange = {},
-                    label = { Text("Código de Tractor") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors(),
-                    readOnly = true
-                )
+                if (codImplemento.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black.copy(alpha = 0.15f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Datos Básicos del Implemento",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "Código de Tractor:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                                Text(text = codTractor, color = Color.Black)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "Número de boquillas:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                                Text(text = numBoquillasStr, color = Color.Black)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "Dist. entre Boquillas:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                                Text(text = "$distBoquillas m", color = Color.Black)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "Longitud Brazo:", color = Color.Black, fontWeight = FontWeight.SemiBold)
+                                Text(text = "$longitudBrazo m", color = Color.Black)
+                            }
+                        }
+                    }
 
-                OutlinedTextField(
-                    value = volumenTanqueStr,
-                    onValueChange = { volumenTanqueStr = it },
-                    label = { Text("Volumen del tanque (Litros)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
+                    OutlinedTextField(
+                        value = volumenTanqueStr,
+                        onValueChange = { volumenTanqueStr = it },
+                        label = { Text("Volumen del tanque (Litros)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
 
-                OutlinedTextField(
-                    value = numBoquillasStr,
-                    onValueChange = {},
-                    label = { Text("Número de boquillas") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors(),
-                    readOnly = true
-                )
+                    ExposedDropdownMenuBox(
+                        expanded = expandedTipoBoquillas,
+                        onExpandedChange = { expandedTipoBoquillas = !expandedTipoBoquillas },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = tipoBoquillas,
+                            onValueChange = {},
+                            label = { Text("Tipo de boquilla") },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = blackTextFieldColors(),
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedTipoBoquillas)
+                            }
+                        )
+                        DropdownMenu(
+                            expanded = expandedTipoBoquillas,
+                            onDismissRequest = { expandedTipoBoquillas = false },
+                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                        ) {
+                            listOf("Cono", "Abanico").forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type, color = Color.Black) },
+                                    onClick = {
+                                        tipoBoquillas = type
+                                        expandedTipoBoquillas = false
+                                    }
+                                )
+                            }
+                        }
+                    }
 
-                OutlinedTextField(
-                    value = if (codImplemento.isNotEmpty()) "$distBoquillas m" else "",
-                    onValueChange = {},
-                    label = { Text("Dist. entre Boquillas") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors(),
-                    readOnly = true
-                )
+                    OutlinedTextField(
+                        value = tiempoStr,
+                        onValueChange = { tiempoStr = it },
+                        label = { Text("Tiempo de descarga (segundos)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
 
-                OutlinedTextField(
-                    value = if (codImplemento.isNotEmpty()) "$longitudBrazo m" else "",
-                    onValueChange = {},
-                    label = { Text("Longitud Brazo") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors(),
-                    readOnly = true
-                )
-
-                OutlinedTextField(
-                    value = tipoBoquillas,
-                    onValueChange = { tipoBoquillas = it },
-                    label = { Text("Tipo de boquillas") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
-
-                OutlinedTextField(
-                    value = referenciaBoquillas,
-                    onValueChange = { referenciaBoquillas = it },
-                    label = { Text("Referencia de boquillas") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
-
-                OutlinedTextField(
-                    value = tiempoStr,
-                    onValueChange = { tiempoStr = it },
-                    label = { Text("Tiempo de descarga (segundos)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
-
-                OutlinedTextField(
-                    value = descargaStr,
-                    onValueChange = { descargaStr = it },
-                    label = { Text("Descarga (cc)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = blackTextFieldColors()
-                )
+                    OutlinedTextField(
+                        value = descargaStr,
+                        onValueChange = { descargaStr = it },
+                        label = { Text("Descarga (cc)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = blackTextFieldColors()
+                    )
+                }
 
                 HorizontalDivider(color = Color.Black.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
 
@@ -3309,7 +3315,7 @@ fun FormularioCalibracionScreen(
                                 implementoCalib = codImplemento,
                                 numBoquillas = numBoquillas,
                                 tipoBoquillas = tipoBoquillas,
-                                referenciaBoquillas = referenciaBoquillas,
+                                referenciaBoquillas = "",
                                 tiempoCalib = tiempoVal,
                                 descargaCalib = descargaVal,
                                 calculosRecorrido = listRecorridos,
@@ -3425,15 +3431,15 @@ object PdfExportManager {
             paintText.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
             
             val distBoquillas = when (audit.implementoCalib) {
-                "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
-                "IA - 64", "IA - 67" -> 0.3
+                "IA - 14", "IA - 28", "IA - 53", "IA - 81" -> 0.4
+                "IA - 64", "IA - 67", "IA - 82" -> 0.3
                 else -> 0.5
             }
             val longitudBrazo = when (audit.implementoCalib) {
-                "IA - 14", "IA - 53 (VALOR)" -> 15.3
-                "IA - 28" -> 15.8
+                "IA - 14", "IA - 53" -> 15.3
+                "IA - 28", "IA - 81" -> 15.8
                 "IA - 64" -> 14.65
-                "IA - 67" -> 14.24
+                "IA - 67", "IA - 82" -> 14.24
                 else -> 0.0
             }
             
@@ -3445,16 +3451,11 @@ object PdfExportManager {
             canvas.drawText("Descarga promedio: ${audit.descargaCalib} cc", col2X, currentY, paintText)
             currentY += 16f
             
-            canvas.drawText("Referencia boquillas: ${audit.referenciaBoquillas}", col1X, currentY, paintText)
-            canvas.drawText("Dist. entre Boquillas: ${distBoquillas} m", col2X, currentY, paintText)
-            currentY += 16f
-            
+            canvas.drawText("Dist. entre Boquillas: ${distBoquillas} m", col1X, currentY, paintText)
             if (longitudBrazo > 0.0) {
-                canvas.drawText("Longitud Brazo: ${longitudBrazo} m", col1X, currentY, paintText)
-                currentY += 24f
-            } else {
-                currentY += 8f
+                canvas.drawText("Longitud Brazo: ${longitudBrazo} m", col2X, currentY, paintText)
             }
+            currentY += 24f
 
             // 4. RUNS TABLE (CÁLCULOS DE RECORRIDO)
             paintText.color = android.graphics.Color.rgb(0, 100, 80)
@@ -3561,8 +3562,8 @@ object PdfExportManager {
             val avgVelKmh = avgVel * 3.6
             
             val distBoquillasVal = when (audit.implementoCalib) {
-                "IA - 14", "IA - 28", "IA - 53 (VALOR)" -> 0.4
-                "IA - 64", "IA - 67" -> 0.3
+                "IA - 14", "IA - 28", "IA - 53", "IA - 81" -> 0.4
+                "IA - 64", "IA - 67", "IA - 82" -> 0.3
                 else -> 0.5
             }
             val w = audit.numBoquillas * distBoquillasVal
