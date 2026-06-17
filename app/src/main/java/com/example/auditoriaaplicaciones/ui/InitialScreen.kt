@@ -906,8 +906,16 @@ fun FormularioAuditoriaScreen(
     onContinue: (AuditoriaInfo) -> Unit
 ) {
     var operador by rememberSaveable { mutableStateOf(info.operador) }
-    var codTractor by rememberSaveable { mutableStateOf(info.codTractor) }
     var codImplemento by rememberSaveable { mutableStateOf(info.codImplemento) }
+    
+    var codTractor by rememberSaveable { 
+        mutableStateOf(
+            if (info.codTractor.isNotEmpty()) info.codTractor
+            else if (info.codImplemento.isNotEmpty()) "TA-12"
+            else "TA-12"
+        ) 
+    }
+
     var potenciaTractor by rememberSaveable { mutableStateOf(info.potenciaTractor) }
     var potenciaTdf by rememberSaveable { mutableStateOf(info.potenciaTdf) }
     var formula by rememberSaveable { mutableStateOf(info.formula) }
@@ -926,16 +934,56 @@ fun FormularioAuditoriaScreen(
         insumosList.firstOrNull { it.codigo == info.formula }?.descripcion ?: ""
     ) }
 
-    val tractorList = remember { List(41) { "TA-${(it + 1).toString().padStart(2, '0')}" } }
-    val implementList = remember { List(81) { "IA-${(it + 1).toString().padStart(2, '0')}" } }
-    var expandedTractor by rememberSaveable { mutableStateOf(false) }
+    val implementList = remember { listOf("IA - 14", "IA - 28", "IA - 53", "IA - 64", "IA - 67", "IA - 81", "IA - 82") }
     var expandedImplement by rememberSaveable { mutableStateOf(false) }
 
     // --- Lógica Boquillas Aleatorias ---
-    var longitudBrazoIzquierdo by rememberSaveable { mutableStateOf(info.longitudBrazoIzquierdo) }
-    var longitudBrazoDerecho by rememberSaveable { mutableStateOf(info.longitudBrazoDerecho) }
-    var cantidadBoquillasIzquierdas by rememberSaveable { mutableStateOf(info.cantidadBoquillasIzquierdas) }
-    var cantidadBoquillasDerechas by rememberSaveable { mutableStateOf(info.cantidadBoquillasDerechas) }
+    var longitudBrazoIzquierdo by rememberSaveable {
+        mutableStateOf(
+            if (info.longitudBrazoIzquierdo.isNotEmpty()) info.longitudBrazoIzquierdo
+            else when (info.codImplemento) {
+                "IA - 14", "IA - 53" -> "15.3"
+                "IA - 28", "IA - 81" -> "15.8"
+                "IA - 64" -> "14.65"
+                "IA - 67", "IA - 82" -> "14.24"
+                else -> ""
+            }
+        )
+    }
+    var longitudBrazoDerecho by rememberSaveable {
+        mutableStateOf(
+            if (info.longitudBrazoDerecho.isNotEmpty()) info.longitudBrazoDerecho
+            else when (info.codImplemento) {
+                "IA - 14", "IA - 53" -> "15.3"
+                "IA - 28", "IA - 81" -> "15.8"
+                "IA - 64" -> "14.65"
+                "IA - 67", "IA - 82" -> "14.24"
+                else -> ""
+            }
+        )
+    }
+    var cantidadBoquillasIzquierdas by rememberSaveable {
+        mutableStateOf(
+            if (info.cantidadBoquillasIzquierdas.isNotEmpty()) info.cantidadBoquillasIzquierdas
+            else when (info.codImplemento) {
+                "IA - 14", "IA - 53" -> "40"
+                "IA - 28", "IA - 81", "IA - 64" -> "45"
+                "IA - 67", "IA - 82" -> "50"
+                else -> ""
+            }
+        )
+    }
+    var cantidadBoquillasDerechas by rememberSaveable {
+        mutableStateOf(
+            if (info.cantidadBoquillasDerechas.isNotEmpty()) info.cantidadBoquillasDerechas
+            else when (info.codImplemento) {
+                "IA - 14", "IA - 53" -> "40"
+                "IA - 28", "IA - 81", "IA - 64" -> "45"
+                "IA - 67", "IA - 82" -> "50"
+                else -> ""
+            }
+        )
+    }
 
     var leftNozzles by rememberSaveable { mutableStateOf(info.nozzlesIzquierdo) }
     var rightNozzles by rememberSaveable { mutableStateOf(info.nozzlesDerecho) }
@@ -1072,42 +1120,7 @@ fun FormularioAuditoriaScreen(
                 // --- Form Fields ---
                 OutlinedTextField(value = operador, onValueChange = { operador = it }, label = { Text("Nombre operador") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 
-                ExposedDropdownMenuBox(
-                    expanded = expandedTractor,
-                    onExpandedChange = { expandedTractor = !expandedTractor },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = codTractor,
-                        onValueChange = { 
-                            codTractor = it
-                            expandedTractor = true
-                        },
-                        label = { Text("Cód. Tractor") },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
-                    )
-                    val filteredTractors = tractorList.filter { it.contains(codTractor, ignoreCase = true) }
-                    if (filteredTractors.isNotEmpty() && expandedTractor) {
-                        DropdownMenu(
-                            expanded = expandedTractor,
-                            onDismissRequest = { expandedTractor = false },
-                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
-                        ) {
-                            filteredTractors.forEach { cod ->
-                                DropdownMenuItem(
-                                    text = { Text(cod, color = Color.Black) },
-                                    onClick = {
-                                        codTractor = cod
-                                        expandedTractor = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
+                // Implement selector
                 ExposedDropdownMenuBox(
                     expanded = expandedImplement,
                     onExpandedChange = { expandedImplement = !expandedImplement },
@@ -1115,34 +1128,61 @@ fun FormularioAuditoriaScreen(
                 ) {
                     OutlinedTextField(
                         value = codImplemento,
-                        onValueChange = { 
-                            codImplemento = it
-                            expandedImplement = true
-                        },
+                        onValueChange = {},
                         label = { Text("Cód. Implemento") },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = blackTextFieldColors()
+                        colors = blackTextFieldColors(),
+                        readOnly = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedImplement)
+                        }
                     )
-                    val filteredImplements = implementList.filter { it.contains(codImplemento, ignoreCase = true) }
-                    if (filteredImplements.isNotEmpty() && expandedImplement) {
-                        DropdownMenu(
-                            expanded = expandedImplement,
-                            onDismissRequest = { expandedImplement = false },
-                            modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
-                        ) {
-                            filteredImplements.forEach { cod ->
-                                DropdownMenuItem(
-                                    text = { Text(cod, color = Color.Black) },
-                                    onClick = {
-                                        codImplemento = cod
-                                        expandedImplement = false
+                    DropdownMenu(
+                        expanded = expandedImplement,
+                        onDismissRequest = { expandedImplement = false },
+                        modifier = Modifier.exposedDropdownSize().background(Color(0xFFEAD7BC))
+                    ) {
+                        implementList.forEach { cod ->
+                            DropdownMenuItem(
+                                text = { Text(cod, color = Color.Black) },
+                                onClick = {
+                                    codImplemento = cod
+                                    expandedImplement = false
+                                    codTractor = "TA-12"
+                                    
+                                    val longVal = when (cod) {
+                                        "IA - 14", "IA - 53" -> "15.3"
+                                        "IA - 28", "IA - 81" -> "15.8"
+                                        "IA - 64" -> "14.65"
+                                        "IA - 67", "IA - 82" -> "14.24"
+                                        else -> ""
                                     }
-                                )
-                            }
+                                    val boqVal = when (cod) {
+                                        "IA - 14", "IA - 53" -> "40"
+                                        "IA - 28", "IA - 81", "IA - 64" -> "45"
+                                        "IA - 67", "IA - 82" -> "50"
+                                        else -> ""
+                                    }
+                                    longitudBrazoIzquierdo = longVal
+                                    longitudBrazoDerecho = longVal
+                                    cantidadBoquillasIzquierdas = boqVal
+                                    cantidadBoquillasDerechas = boqVal
+                                }
+                            )
                         }
                     }
                 }
+
+                OutlinedTextField(
+                    value = codTractor,
+                    onValueChange = {},
+                    label = { Text("Cód. Tractor") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
                 OutlinedTextField(value = potenciaTractor, onValueChange = { potenciaTractor = it }, label = { Text("Potencia Tractor (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
                 OutlinedTextField(value = potenciaTdf, onValueChange = { potenciaTdf = it }, label = { Text("Potencia TDF/PPO (HP)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
 
@@ -1331,10 +1371,42 @@ fun FormularioAuditoriaScreen(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Black.copy(alpha = 0.2f))
 
-                OutlinedTextField(value = longitudBrazoIzquierdo, onValueChange = { longitudBrazoIzquierdo = it }, label = { Text("Longitud Brazo Izquierdo (m)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                OutlinedTextField(value = longitudBrazoDerecho, onValueChange = { longitudBrazoDerecho = it }, label = { Text("Longitud Brazo Derecho (m)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                OutlinedTextField(value = cantidadBoquillasDerechas, onValueChange = { cantidadBoquillasDerechas = it }, label = { Text("Cantidad Boquillas Brazo Derecho") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
-                OutlinedTextField(value = cantidadBoquillasIzquierdas, onValueChange = { cantidadBoquillasIzquierdas = it }, label = { Text("Cantidad Boquillas Brazo Izquierdo") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), colors = blackTextFieldColors())
+                OutlinedTextField(
+                    value = longitudBrazoIzquierdo,
+                    onValueChange = {},
+                    label = { Text("Longitud Brazo Izquierdo (m)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
+                OutlinedTextField(
+                    value = longitudBrazoDerecho,
+                    onValueChange = {},
+                    label = { Text("Longitud Brazo Derecho (m)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
+                OutlinedTextField(
+                    value = cantidadBoquillasDerechas,
+                    onValueChange = {},
+                    label = { Text("Cantidad Boquillas Brazo Derecho") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
+                OutlinedTextField(
+                    value = cantidadBoquillasIzquierdas,
+                    onValueChange = {},
+                    label = { Text("Cantidad Boquillas Brazo Izquierdo") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = blackTextFieldColors(),
+                    readOnly = true
+                )
 
                 Button(
                     onClick = {
@@ -1569,18 +1641,126 @@ fun FormularioAuditoriaScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
                 if (showRecommendationDialog) {
+                    val nTotal = (cantidadBoquillasIzquierdas.toIntOrNull() ?: 0) + (cantidadBoquillasDerechas.toIntOrNull() ?: 0)
+                    val numClogged = if (boquillasTapadas == true) (boquillasTapadasNum.toIntOrNull() ?: 0) else 0
+                    
+                    val allEvaluated = leftNozzles + rightNozzles
+                    val flowsMLs = mutableListOf<Float>()
+                    val lhaResults = mutableListOf<Float>()
+                    
+                    val dist = calcDistance
+                    val vTime = calcTimeSec
+                    val longIzqVal = longitudBrazoIzquierdo.toFloatOrNull() ?: 0f
+                    val longDerVal = longitudBrazoDerecho.toFloatOrNull() ?: 0f
+                    
+                    allEvaluated.forEach { nozzle ->
+                        val nTime = nozzle.tiempoSegundos.toFloat()
+                        val nVol = nozzle.volumen.toFloatOrNull() ?: 0f
+                        if (nTime > 0) {
+                            val flow = nVol / nTime
+                            flowsMLs.add(flow)
+                            val totalVolTripL = (flow * vTime) / 1000f
+                            val isLeft = leftNozzles.any { it.id == nozzle.id }
+                            val armLen = if (isLeft) longIzqVal else longDerVal
+                            if (armLen > 0) {
+                                val areaHa = (armLen * dist) / 10000f
+                                if (areaHa > 0) {
+                                    val lhaIndividual = (totalVolTripL / areaHa) * nTotal
+                                    lhaResults.add(lhaIndividual)
+                                }
+                            }
+                        }
+                    }
+                    
+                    val avgLHa = if (lhaResults.isNotEmpty()) lhaResults.average().toFloat() else 0f
+                    val volumenPercent = if (avgLHa > 0f) (avgLHa / 2000f) * 100f else 0f
+                    val alturaPercent = if (alturaUniforme == true) 100f else 0f
+                    val boquillasPercent = if (nTotal > 0) ((nTotal - numClogged).toFloat() / nTotal.toFloat()) * 100f else 100f
+                    
+                    val meanFlow = if (flowsMLs.isNotEmpty()) flowsMLs.average() else 0.0
+                    val avgDevFlow = if (flowsMLs.isNotEmpty()) flowsMLs.map { Math.abs(it - meanFlow) }.average() else 0.0
+                    val uniformidadPercent = if (meanFlow > 0.0) (1.0 - (avgDevFlow / meanFlow)) * 100.0 else 0.0
+
+                    val volCumple = volumenPercent in 90f..100f
+                    val altCumple = alturaPercent in 70f..100f
+                    val boqCumple = boquillasPercent in 90f..100f
+                    val uniCumple = uniformidadPercent in 90.0..100.0
+
                     AlertDialog(
                         onDismissRequest = { showRecommendationDialog = false },
-                        title = { Text("Recomendaciones de Auditoría", fontWeight = FontWeight.Bold) },
+                        title = { Text("Resultados y Recomendaciones", fontWeight = FontWeight.Bold, color = Color.Black) },
                         text = {
-                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                                Text(recommendationMessage)
+                            Column(
+                                modifier = Modifier.verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black.copy(alpha = 0.15f))
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        // Header Row
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().background(Color(0xFFEAD7BC)).padding(8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(text = "Variable", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(1.5f), fontSize = 11.sp)
+                                            Text(text = "Unid.", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                            Text(text = "Margen", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                            Text(text = "Valor", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                            Text(text = "Est.", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                        }
+
+                                        val itemsList = listOf(
+                                            Triple("VOLUMEN/Ha", "90 - 100%", Pair(volumenPercent, volCumple)),
+                                            Triple("ALTURA UNIFORME", "70 - 100%", Pair(alturaPercent, altCumple)),
+                                            Triple("BOQUILLAS TAPADAS", "90 - 100%", Pair(boquillasPercent, boqCumple)),
+                                            Triple("UNIFORMIDAD", "90 - 100%", Pair(uniformidadPercent.toFloat(), uniCumple))
+                                        )
+
+                                        itemsList.forEach { (name, margin, res) ->
+                                            val (percent, cumple) = res
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(text = name, color = Color.Black, modifier = Modifier.weight(1.5f), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                                Text(text = "%", color = Color.Black, modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center, fontSize = 10.sp)
+                                                Text(text = margin, color = Color.Black, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 10.sp)
+                                                Text(
+                                                    text = String.format(Locale.US, "%.1f%%", percent),
+                                                    color = Color.Black,
+                                                    modifier = Modifier.weight(0.8f),
+                                                    textAlign = TextAlign.Center,
+                                                    fontSize = 10.sp
+                                                )
+                                                Text(
+                                                    text = if (cumple) "✓" else "✗",
+                                                    color = if (cumple) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.weight(0.4f),
+                                                    textAlign = TextAlign.Center,
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                            HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = recommendationMessage,
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         },
                         confirmButton = {
                             TextButton(onClick = { 
                                 showRecommendationDialog = false
-                                // Una vez visto, procedemos a realizar el onContinue para volver al menú
                                 val updatedInfo = info.copy(
                                     operador = operador,
                                     codTractor = codTractor,
@@ -1608,7 +1788,7 @@ fun FormularioAuditoriaScreen(
                                     papelGotas1cm = papelGotas1cm,
                                     tamanoGotas = tamanoGotas,
                                     ubicacion = if (capturedLocation.isEmpty()) "0,0" else capturedLocation,
-                                    velocidadOptima = info.velocidadOptima // This was updated in the onClick of Guardar
+                                    velocidadOptima = info.velocidadOptima
                                 )
                                 onContinue(updatedInfo)
                             }) {
