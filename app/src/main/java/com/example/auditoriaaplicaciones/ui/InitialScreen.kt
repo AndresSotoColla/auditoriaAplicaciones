@@ -2097,14 +2097,14 @@ fun HistorialScreen(onBack: () -> Unit) {
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    val unsyncedCount = audits.count { !it.isSynced && it.tipoAuditoria == "Spray Boom" }
+                    val unsyncedCount = audits.count { !it.isSynced && (it.tipoAuditoria == "Spray Boom" || it.tipoAuditoria == "Mezclas") }
                     if (unsyncedCount > 0) {
                         IconButton(
                             onClick = {
-                                val sprayBoomAudits = audits.filter { it.tipoAuditoria == "Spray Boom" && !it.isSynced }
+                                val auditsToSync = audits.filter { (it.tipoAuditoria == "Spray Boom" || it.tipoAuditoria == "Mezclas") && !it.isSynced }
                                 Toast.makeText(context, "Iniciando carga de $unsyncedCount registros...", Toast.LENGTH_SHORT).show()
                                 
-                                sprayBoomAudits.forEach { audit ->
+                                auditsToSync.forEach { audit ->
                                     SyncManager.syncAudit(context, audit) { success, msg ->
                                         // Regresar al hilo principal para mostrar el Toast
                                         (context as? android.app.Activity)?.runOnUiThread {
@@ -2181,7 +2181,7 @@ fun HistorialScreen(onBack: () -> Unit) {
                                         }
                                     }
 
-                                    if (!audit.isSynced && audit.tipoAuditoria == "Spray Boom") {
+                                    if (!audit.isSynced && (audit.tipoAuditoria == "Spray Boom" || audit.tipoAuditoria == "Mezclas")) {
                                         IconButton(onClick = {
                                             SyncManager.syncAudit(context, audit) { success, msg ->
                                                 (context as? android.app.Activity)?.runOnUiThread {
