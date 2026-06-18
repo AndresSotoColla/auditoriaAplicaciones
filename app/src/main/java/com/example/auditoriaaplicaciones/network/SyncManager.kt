@@ -54,6 +54,9 @@ object SyncManager {
             jsonMap["tanque_limpio"] = audit.tanqueLimpio
             jsonMap["obs_tanque_limpio"] = audit.obsTanqueLimpio
             jsonMap["observaciones"] = audit.observaciones
+            jsonMap["agua_percent"] = audit.getMezclasAguaPercent()
+            jsonMap["insumos_percent"] = audit.getMezclasInsumosPercent()
+            jsonMap["datos_generales_percent"] = audit.getMezclasDatosGeneralesPercent()
 
             // Products List
             val productsList = audit.productosEvaluados.map { prod ->
@@ -67,6 +70,67 @@ object SyncManager {
                 )
             }
             jsonMap["productos_evaluados"] = productsList
+        } else if (tipoAud.contains("calib")) {
+            jsonMap["tipo_auditoria"] = "calibracion"
+
+            // Basic Info
+            jsonMap["evaluador"] = audit.evaluador
+            jsonMap["fecha"] = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(audit.fecha))
+            jsonMap["hora"] = if (audit.hora.length == 5) "${audit.hora}:00" else audit.hora
+            jsonMap["finca"] = audit.finca
+            jsonMap["lote"] = audit.lote
+            jsonMap["operario"] = audit.operarioCalib
+            jsonMap["tractor"] = audit.tractorCalib
+            jsonMap["volumen_tanque"] = audit.volumenTanque
+            jsonMap["implemento"] = audit.implementoCalib
+            jsonMap["num_boquillas"] = audit.numBoquillas
+            jsonMap["tipo_boquillas"] = audit.tipoBoquillas
+            jsonMap["referencia_boquillas"] = audit.referenciaBoquillas
+            jsonMap["tiempo_descarga"] = audit.tiempoCalib
+            jsonMap["descarga"] = audit.descargaCalib
+
+            // Calculated Metrics
+            val q = if (audit.tiempoCalib > 0.0) (audit.descargaCalib / audit.tiempoCalib) * 0.06 else 0.0
+            val qTot = audit.numBoquillas * q
+            jsonMap["caudal_boquilla"] = q
+            jsonMap["caudal_total"] = qTot
+
+            val validRuns = audit.calculosRecorrido.filter { it.distancia > 0.0 && it.tiempo > 0.0 }
+            val avgDist = if (validRuns.isNotEmpty()) validRuns.map { it.distancia }.average() else 0.0
+            val avgTime = if (validRuns.isNotEmpty()) validRuns.map { it.tiempo }.average() else 0.0
+            val avgVol = if (validRuns.isNotEmpty()) validRuns.map { it.volumenAplicado }.average() else 0.0
+            val avgVelKmh = if (avgTime > 0.0) (avgDist / avgTime) * 3.6 else 0.0
+
+            val distBoquillas = audit.distBoquillasCalib.toDoubleOrNull() ?: when (audit.implementoCalib) {
+                "IA - 14", "IA - 28", "IA - 53", "IA - 81" -> 0.4
+                "IA - 64", "IA - 67", "IA - 82" -> 0.3
+                else -> 0.5
+            }
+            val w = audit.numBoquillas * distBoquillas
+            val areaRecHa = (w * avgDist) / 10000.0
+            val dosReal = if (areaRecHa > 0.0) avgVol / areaRecHa else 0.0
+            val areaTotTanq = if (dosReal > 0.0) audit.volumenTanque / dosReal else 0.0
+            val velReq = q * 0.6
+
+            jsonMap["promedio_distancia"] = avgDist
+            jsonMap["promedio_tiempo"] = avgTime
+            jsonMap["promedio_velocidad_kmh"] = avgVelKmh
+            jsonMap["area_recorrida_ha"] = areaRecHa
+            jsonMap["area_total_tanque_ha"] = areaTotTanq
+            jsonMap["velocidad_requerida_kmh"] = velReq
+            jsonMap["observaciones"] = audit.observaciones
+            jsonMap["dist_boquillas"] = audit.distBoquillasCalib
+            jsonMap["longitud_brazo"] = audit.longitudBrazoCalib
+
+            // Runs List
+            val runsList = audit.calculosRecorrido.map { run ->
+                mapOf(
+                    "distancia" to run.distancia,
+                    "tiempo" to run.tiempo,
+                    "volumen_aplicado" to run.volumenAplicado
+                )
+            }
+            jsonMap["calculos_recorrido"] = runsList
         } else {
             jsonMap["tipo_auditoria"] = "sprayboom"
 

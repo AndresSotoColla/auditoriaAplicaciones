@@ -246,6 +246,33 @@ data class AuditoriaInfo(
         val avgDevFlow = if (flowsMLs.isNotEmpty()) flowsMLs.map { Math.abs(it - meanFlow) }.average() else 0.0
         return if (meanFlow > 0.0) (1.0 - (avgDevFlow / meanFlow)) * 100.0 else 0.0
     }
+
+    fun getMezclasAguaPercent(): Float {
+        val ph = phAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+        val dureza = durezaAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+        val ce = ceAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+
+        val phScore = if (phAgua.isNotEmpty() && ph >= 5.0 && ph <= 5.8) 100.0 / 3.0 else 0.0
+        val durezaScore = if (durezaAgua.isNotEmpty() && dureza < 120.0) 100.0 / 3.0 else 0.0
+        val ceScore = if (ceAgua.isNotEmpty() && ce < 70.0) 100.0 / 3.0 else 0.0
+
+        return (phScore + durezaScore + ceScore).toFloat()
+    }
+
+    fun getMezclasInsumosPercent(): Float {
+        if (productosEvaluados.isEmpty()) return 100f
+        val cumpleCount = productosEvaluados.count { it.cumple }
+        return (cumpleCount.toFloat() / productosEvaluados.size.toFloat()) * 100f
+    }
+
+    fun getMezclasDatosGeneralesPercent(): Float {
+        var score = 0f
+        if (!incompatibilidad) score += 25f
+        if (ordenMezclado) score += 25f
+        if (usaEpp) score += 25f
+        if (tanqueLimpio) score += 25f
+        return score
+    }
 }
 
 @Composable
@@ -2125,11 +2152,11 @@ fun HistorialScreen(onBack: () -> Unit) {
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    val unsyncedCount = audits.count { !it.isSynced && (it.tipoAuditoria == "Spray Boom" || it.tipoAuditoria == "Mezclas") }
+                    val unsyncedCount = audits.count { !it.isSynced && (it.tipoAuditoria == "Spray Boom" || it.tipoAuditoria == "Mezclas" || it.tipoAuditoria == "Calibracion Spray Boom") }
                     if (unsyncedCount > 0) {
                         IconButton(
                             onClick = {
-                                val auditsToSync = audits.filter { (it.tipoAuditoria == "Spray Boom" || it.tipoAuditoria == "Mezclas") && !it.isSynced }
+                                val auditsToSync = audits.filter { (it.tipoAuditoria == "Spray Boom" || it.tipoAuditoria == "Mezclas" || it.tipoAuditoria == "Calibracion Spray Boom") && !it.isSynced }
                                 Toast.makeText(context, "Iniciando carga de $unsyncedCount registros...", Toast.LENGTH_SHORT).show()
                                 
                                 auditsToSync.forEach { audit ->
@@ -2209,7 +2236,7 @@ fun HistorialScreen(onBack: () -> Unit) {
                                         }
                                     }
 
-                                    if (!audit.isSynced && (audit.tipoAuditoria == "Spray Boom" || audit.tipoAuditoria == "Mezclas")) {
+                                    if (!audit.isSynced && (audit.tipoAuditoria == "Spray Boom" || audit.tipoAuditoria == "Mezclas" || audit.tipoAuditoria == "Calibracion Spray Boom")) {
                                         IconButton(onClick = {
                                             SyncManager.syncAudit(context, audit) { success, msg ->
                                                 (context as? android.app.Activity)?.runOnUiThread {
@@ -2273,7 +2300,8 @@ object ExportManager {
                 "pH Final", "CE Final mS/cm",
                 "Mezclador", "Formula",
                 "Productos Evaluados (JSON)", "Incompatibilidad", "Respeta Orden", "Obs Orden",
-                "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque", "Observaciones"
+                "Usa EPP", "Obs EPP", "Tanque Limpio", "Obs Tanque", "Observaciones",
+                "Agua_Percent", "Insumos_Percent", "Datos_Generales_Percent"
             )
 
             val calibHeaders = arrayOf(
@@ -2331,6 +2359,9 @@ object ExportManager {
                     row.createCell(19).setCellValue(if (audit.tanqueLimpio) "SI" else "NO")
                     row.createCell(20).setCellValue(audit.obsTanqueLimpio)
                     row.createCell(21).setCellValue(audit.observaciones)
+                    row.createCell(22).setCellValue(audit.getMezclasAguaPercent().toDouble())
+                    row.createCell(23).setCellValue(audit.getMezclasInsumosPercent().toDouble())
+                    row.createCell(24).setCellValue(audit.getMezclasDatosGeneralesPercent().toDouble())
                 } else if (audit.tipoAuditoria == "Calibracion Spray Boom") {
                     val row = calibSheet.createRow(calRowIdx++)
                     row.createCell(0).setCellValue(audit.id)
@@ -2497,6 +2528,10 @@ fun FormularioMezclasScreen(
     var mezclador by rememberSaveable { mutableStateOf(info.mezclador) }
     var formula by rememberSaveable { mutableStateOf(info.formulaMezclar) }
     var manualFormulaName by rememberSaveable { mutableStateOf(if (info.formulaMezclar == "OTRO") "" else "") }
+
+    var showRecommendationDialog by remember { mutableStateOf(false) }
+    var recommendationMessage by remember { mutableStateOf("") }
+    var finalInfoToSave by remember { mutableStateOf<AuditoriaInfo?>(null) }
 
     val context = LocalContext.current
     val insumosList = remember { parseCsv(context) }
@@ -2964,7 +2999,7 @@ fun FormularioMezclasScreen(
                     }
                     Button(
                         onClick = {
-                            val updatedInfo = info.copy(
+                            val tempInfo = info.copy(
                                 mezclador = mezclador,
                                 formulaMezclar = if (formula == "OTRO") manualFormulaName else formula,
                                 productosEvaluados = productosEvaluados,
@@ -2979,7 +3014,58 @@ fun FormularioMezclasScreen(
                                 ceFinal = ceFinal,
                                 observaciones = observaciones
                             )
-                            onContinue(updatedInfo)
+                            finalInfoToSave = tempInfo
+
+                            val sb = java.lang.StringBuilder()
+                            val ph = tempInfo.phAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+                            val dureza = tempInfo.durezaAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+                            val ce = tempInfo.ceAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+
+                            if (tempInfo.phAgua.isEmpty()) {
+                                sb.append("❌ No se ingresó el pH del agua.\n")
+                            } else if (ph < 5.0 || ph > 5.8) {
+                                sb.append("❌ El pH inicial ($ph) no está en el rango aceptable de 5.0 a 5.8. Se recomienda corregir con un regulador de pH para alcanzar el ideal de 5.5.\n")
+                            } else if (ph != 5.5) {
+                                sb.append("⚠️ El pH está bien (rango aceptable), pero idealmente es 5.5.\n")
+                            }
+
+                            if (tempInfo.durezaAgua.isEmpty()) {
+                                sb.append("❌ No se ingresó la dureza del agua.\n")
+                            } else if (dureza >= 120.0) {
+                                sb.append("❌ La dureza del agua ($dureza ppm) es elevada (debe ser menor a 120 ppm). Use un secuestrante de sales o ablandador.\n")
+                            } else if (dureza >= 80.0) {
+                                sb.append("⚠️ La dureza está bien (aceptable menor a 120 ppm), pero idealmente es menor a 80 ppm.\n")
+                            }
+
+                            if (tempInfo.ceAgua.isEmpty()) {
+                                sb.append("❌ No se ingresó la conductividad eléctrica del agua.\n")
+                            } else if (ce >= 70.0) {
+                                sb.append("❌ La conductividad eléctrica ($ce mS/cm) es muy alta (debe ser menor a 70 mS/cm).\n")
+                            }
+
+                            if (tempInfo.getMezclasInsumosPercent() < 100f) {
+                                sb.append("⚠️ Se reportaron productos reemplazados. Verifique que los sustitutos mantengan la dosificación y compatibilidad técnica.\n")
+                            }
+
+                            if (tempInfo.incompatibilidad) {
+                                sb.append("❌ Se reportó incompatibilidad en la mezcla. Revise los productos o el orden.\n")
+                            }
+                            if (!tempInfo.ordenMezclado) {
+                                sb.append("❌ No se respetó el orden de mezclado. Siga el orden recomendado (WP -> WG -> SC -> SL -> EC) para evitar cortes.\n")
+                            }
+                            if (!tempInfo.usaEpp) {
+                                sb.append("❌ El operario no usó EPP completo. Por seguridad, es obligatorio usar equipo protector.\n")
+                            }
+                            if (!tempInfo.tanqueLimpio) {
+                                sb.append("❌ El tanque no está limpio. Realice una limpieza antes de mezclar.\n")
+                            }
+
+                            if (sb.isEmpty()) {
+                                sb.append("¡Preparación de mezcla óptima! Todos los parámetros cumplen con los rangos ideales.")
+                            }
+
+                            recommendationMessage = sb.toString()
+                            showRecommendationDialog = true
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
@@ -2988,6 +3074,109 @@ fun FormularioMezclasScreen(
                     }
                 }
             }
+        }
+
+        if (showRecommendationDialog && finalInfoToSave != null) {
+            val audit = finalInfoToSave!!
+            val aguaPercent = audit.getMezclasAguaPercent()
+            val insumosPercent = audit.getMezclasInsumosPercent()
+            val datosGeneralesPercent = audit.getMezclasDatosGeneralesPercent()
+
+            val ph = audit.phAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+            val dureza = audit.durezaAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+            val ce = audit.ceAgua.replace(',', '.').toDoubleOrNull() ?: 0.0
+
+            val phOk = audit.phAgua.isNotEmpty() && ph >= 5.0 && ph <= 5.8
+            val durezaOk = audit.durezaAgua.isNotEmpty() && dureza < 120.0
+            val ceOk = audit.ceAgua.isNotEmpty() && ce < 70.0
+            val aguaCumple = phOk && durezaOk && ceOk
+
+            val insumosCumple = insumosPercent == 100f
+            val datosGeneralesCumple = datosGeneralesPercent == 100f
+
+            AlertDialog(
+                onDismissRequest = { showRecommendationDialog = false },
+                containerColor = Color.White,
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+                modifier = Modifier.fillMaxWidth(0.95f).padding(16.dp),
+                title = { Text("Resultados y Recomendaciones", fontWeight = FontWeight.Bold, color = Color.Black) },
+                text = {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black.copy(alpha = 0.15f))
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // Header Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().background(Color(0xFFEAD7BC)).padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = "Variable", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(1.5f), fontSize = 11.sp)
+                                    Text(text = "Unid.", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                    Text(text = "Margen", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                    Text(text = "Valor", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                    Text(text = "Est.", fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(0.4f), textAlign = TextAlign.Center, fontSize = 11.sp)
+                                }
+
+                                val itemsList = listOf(
+                                    Triple("CALIDAD AGUA", "100%", Pair(aguaPercent, aguaCumple)),
+                                    Triple("INSUMOS", "100%", Pair(insumosPercent, insumosCumple)),
+                                    Triple("DATOS GENERALES", "100%", Pair(datosGeneralesPercent, datosGeneralesCumple))
+                                )
+
+                                itemsList.forEach { (name, margin, res) ->
+                                    val (percent, cumple) = res
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = name, color = Color.Black, modifier = Modifier.weight(1.5f), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                        Text(text = "%", color = Color.Black, modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center, fontSize = 10.sp)
+                                        Text(text = margin, color = Color.Black, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 10.sp)
+                                        Text(
+                                            text = String.format(Locale.US, "%.1f%%", percent),
+                                            color = Color.Black,
+                                            modifier = Modifier.weight(0.8f),
+                                            textAlign = TextAlign.Center,
+                                            fontSize = 10.sp
+                                        )
+                                        Text(
+                                            text = if (cumple) "✓" else "✗",
+                                            color = if (cumple) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(0.4f),
+                                            textAlign = TextAlign.Center,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = recommendationMessage,
+                            color = Color.Black,
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showRecommendationDialog = false
+                        onContinue(audit)
+                    }) {
+                        Text("Aceptar")
+                    }
+                }
+            )
         }
     }
 }
